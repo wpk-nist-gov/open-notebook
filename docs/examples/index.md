@@ -10,6 +10,4 @@ $ nox -s docs -- -d symlink
 ```{toctree}
 :maxdepth: 2
 
-example-usage
-usage/demo
 ```

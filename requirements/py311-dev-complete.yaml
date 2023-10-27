@@ -24,6 +24,8 @@ dependencies:
   - pytest-xdist
   - ruamel.yaml
   - setuptools-scm>=8.0
+  - tomli
+  - typing-extensions
   - pip
   - pip:
       - noxopt

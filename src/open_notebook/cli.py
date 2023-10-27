@@ -1,4 +1,7 @@
-"""Console script for open-notebook."""
+"""
+Program `open-notebook` (:mod:`~open_notebook.cli`)
+===================================================
+"""
 
 from __future__ import annotations
 
@@ -101,7 +104,7 @@ def get_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def set_verbosity_level(logger: logging.Logger, verbosity: int) -> None:
+def set_verbosity_level(logger: logging.Logger, verbosity: int | None) -> None:
     if verbosity is None:
         return
     elif verbosity < 0:

@@ -1,4 +1,7 @@
-"""Core functionality"""
+"""
+Url creation/opening (:mod:`~open_notebook.handler`)
+====================================================
+"""
 
 from __future__ import annotations
 
@@ -46,7 +49,7 @@ class JupyterUrlHandler:
         if isinstance(paths, (Path, str)):
             paths = [paths]
 
-        urls = []
+        urls: list[str] = []
         for path in map(Path, paths):
             if path.is_dir():
                 url = self._path_to_url(path, modifier=self.dir_prefix, suffix=None)

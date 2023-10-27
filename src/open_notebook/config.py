@@ -1,4 +1,7 @@
-"""Config file handling"""
+"""
+Configuration file routines (:mod:`~open_notebook.config`)
+==========================================================
+"""
 from __future__ import annotations
 
 import subprocess
@@ -101,12 +104,14 @@ class Config:
         data: Mapping[str, Any] | Iterable[Mapping[str, Any]],
         default_params: Mapping[str, Any] | None = None,
     ) -> None:
+        self.data: Iterable[Mapping[str, Any]]
         if isinstance(data, Mapping):
-            data = [data]
+            self.data = [data]  # pyright: ignore
+        else:
+            self.data = data
+
         if default_params is None:
             default_params = DEFAULT_PARAMS
-
-        self.data = data
         self.default_params = default_params
 
     # def append(self, data: Mapping[str, Any], inplace: bool = False) -> Self:
@@ -260,7 +265,7 @@ class Config:
         if isinstance(paths, (str, Path)):
             paths = [paths]  # pragma: no cover
 
-        data = []
+        data: list[dict[str, Any]] = []
         for path in map(Path, paths):
             with path.open("rb") as f:
                 data.append(tomli.load(f))
@@ -278,7 +283,7 @@ class Config:
         if isinstance(strings, str):
             strings = [strings]
 
-        data = []
+        data: list[dict[str, Any]] = []
         for string in strings:
             data.append(tomli.loads(string))
         return cls(data, default_params=default_params)

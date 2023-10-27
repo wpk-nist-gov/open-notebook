@@ -11,3 +11,5 @@ pytest
 pytest-cov
 pytest-sugar
 pytest-xdist
+tomli
+typing-extensions

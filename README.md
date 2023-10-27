@@ -88,7 +88,12 @@ sys.path.pop(0)
 <!-- [[[cog run_command("open-notebook --help", include_cmd=True, wrapper="bash")]]] -->
 ```bash
 $ open-notebook --help
-usage: Program to open jupyter notebooks from central notebook server
+usage: open-notebook [-h] [--host HOST] [-p PORT] [-r ROOT] [--dir-prefix DIR_PREFIX]
+                     [--file-prefix FILE_PREFIX] [--reset] [-c CONFIG] [--create-config]
+                     [--overwrite] [--version] [-v] [--dry]
+                     [paths ...]
+
+Program to open jupyter notebooks from central notebook server.
 
 positional arguments:
   paths                 file or paths to open
@@ -96,7 +101,7 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --host HOST           Host name (default='localhost')
-  --port PORT           Port (default='8888')
+  -p PORT, --port PORT  Port (default='8888')
   -r ROOT, --root ROOT  Directory servers was started in. Defaults to current working directory.
   --dir-prefix DIR_PREFIX
                         Directory prefix (default='tree')
@@ -104,13 +109,20 @@ options:
                         File prefix (default='notebooks')
   --reset
   -c CONFIG, --config CONFIG
-                        config style to use
+                        Config style to use. This is the name of a header in one of the config
+                        files.
   --create-config       If passed, create .open-notebook.ini
   --overwrite           Pass to overwrite `~/.open-notebook.toml` if it exists with `--create-
                         config`
   --version             Print out program version
   -v, --verbose         Set verbosity level. Can pass multiple times.
   --dry                 Dry run.
+
+You can set options with the configuration files ".open-notebook.toml". Configuration files are
+found in the current directory, git root (if in a git tracked tree), and the home directory. Note
+that all these files are considered, in order. That is, you could override a single value in the
+current directory, and the rest would be inherited from, in order, git root and then the home
+directory.
 ```
 
 <!-- [[[end]]] -->
@@ -147,7 +159,7 @@ cd ~/test/a/different/directory
 open-notebook -r ~/test example.ipynb
 ```
 
-#### Configuration file
+### Configuration file
 
 If you always start a notebook in the same place, you can configure
 `open-notebook` as follows:
@@ -156,7 +168,7 @@ If you always start a notebook in the same place, you can configure
 # ~/.open-notebook.toml
 root = "~/test"
 port = "8888"
-...
+
 ```
 
 Options name in the configuration file `.open-notebook.toml` are the same as the
@@ -169,6 +181,7 @@ For example, you can specify that the configuration `alt` uses port `8889` and
 is run in the home directory using:
 
 ```toml
+# ~/.open-notebook.toml
 root = "~/test"
 port = "8888"
 
@@ -181,10 +194,11 @@ port = "8889"
 The default behavior is the same as above. To use the `alt` config, then use:
 
 ```bash
+# will use root="~/" and port="8889".  Other options inherited.
 open-notebook -c alt ...
 ```
 
-#### Multiple configuration files
+### Multiple configuration files
 
 `open-notebook` searches for configuration files `.open-notebook.toml` in the
 current directory, the root of a git repo (if you're currently in a git repo),

@@ -1,4 +1,7 @@
-"""Utilities"""
+"""
+Utilities (:mod:`~open_notebook.utils`)
+=======================================
+"""
 
 from __future__ import annotations
 

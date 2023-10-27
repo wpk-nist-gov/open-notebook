@@ -24,3 +24,5 @@ pytype; python_version < '3.11'
 ruamel.yaml
 scriv
 setuptools-scm>=8.0
+tomli
+typing-extensions

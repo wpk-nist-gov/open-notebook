@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from open_notebook import config
 
 import pytest

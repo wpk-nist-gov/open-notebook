@@ -21,11 +21,15 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering",
 ]
 dynamic = ["readme", "version"]
 requires-python = ">=3.8"
-dependencies = ["tomli"]
+dependencies = [
+    "tomli", #
+    "typing-extensions",
+]
 
 [project.urls]
 homepage = "https://github.com/wpk-nist-gov/open-notebook"
@@ -85,7 +89,9 @@ docs = [
     "sphinx-autobuild",
     "myst-nb",
     "sphinx-book-theme",
+    "pydata-sphinx-theme != 0.14.2",
     "autodocsumm",
+    "sphinx-argparse",
 ]
 # to be parsed with pyproject2conda with --no-base option
 dist-pypi = ["twine", "build"]
@@ -127,7 +133,7 @@ base = false
 
 [[tool.pyproject2conda.overrides]]
 envs = ["test", "typing", "test-extras"]
-python = ["3.8", "3.9", "3.10", "3.11"]
+python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
 [[tool.pyproject2conda.overrides]]
 envs = ["dist-conda"]
@@ -348,26 +354,27 @@ module = []
 include = ["src", "tests"]
 exclude = ["**/__pycache__", ".tox/**", ".nox/**", "**/.mypy_cache"]
 pythonVersion = "3.11"
-typeCheckingMode = "basic"
-# enable subset of "strict"
-reportDuplicateImport = true
-reportInvalidStubStatement = true
-reportOverlappingOverload = true
-reportPropertyTypeMismatch = true
-reportUntypedClassDecorator = true
-reportUntypedFunctionDecorator = true
-reportUntypedNamedTuple = true
-reportUnusedImport = true
-# disable subset of "basic"
-reportGeneralTypeIssues = false
-reportMissingModuleSource = false
-reportOptionalCall = false
-reportOptionalIterable = false
-reportOptionalMemberAccess = false
-reportOptionalOperand = false
-reportOptionalSubscript = false
+typeCheckingMode = "strict"
+# # enable subset of "strict"
+# reportDuplicateImport = true
+# reportInvalidStubStatement = true
+# reportOverlappingOverload = true
+# reportPropertyTypeMismatch = true
+# reportUntypedClassDecorator = true
+# reportUntypedFunctionDecorator = true
+# reportUntypedNamedTuple = true
+# reportUnusedImport = true
+# # disable subset of "basic"
+# reportGeneralTypeIssues = false
+# reportMissingModuleSource = false
+# reportOptionalCall = false
+# reportOptionalIterable = false
+# reportOptionalMemberAccess = false
+# reportOptionalOperand = false
+# reportOptionalSubscript = false
 reportPrivateImportUsage = false
-reportUnboundVariable = false
+reportPrivateUsage = false
 
+# reportUnboundVariable = false
 [tool.pytype]
 inputs = ["src", "tests"]
