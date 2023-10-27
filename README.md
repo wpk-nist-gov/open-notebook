@@ -21,11 +21,11 @@
 [docs-badge]: https://img.shields.io/badge/docs-sphinx-informational
 [docs-link]: https://pages.nist.gov/open-notebook/
 [repo-badge]: https://img.shields.io/badge/--181717?logo=github&logoColor=ffffff
-[repo-link]: https://github.com/wpk-nist-gov/open-notebook
+[repo-link]: https://github.com/usnistgov/open-notebook
 [conda-badge]: https://img.shields.io/conda/v/wpk-nist/open-notebook
 [conda-link]: https://anaconda.org/wpk-nist/open-notebook
 [license-badge]: https://img.shields.io/pypi/l/cmomy?color=informational
-[license-link]: https://github.com/wpk-nist-gov/open-notebook/blob/main/LICENSE
+[license-link]: https://github.com/usnistgov/open-notebook/blob/main/LICENSE
 <!-- prettier-ignore-end -->
 
 <!-- other links -->
@@ -83,6 +83,8 @@ sys.path.pop(0)
 
 ### Options
 
+The main command-line program is `open-notebook` with the following options:
+
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable MD013 -->
 <!-- [[[cog run_command("open-notebook --help", include_cmd=True, wrapper="bash")]]] -->
@@ -130,6 +132,9 @@ directory.
 
 <!-- markdownlint-enable MD013 -->
 
+Equivalently, you can use the short name `nopen`, or use
+`python -m open_notebook`.
+
 ### Basic usage
 
 To open directory tree view:
@@ -138,10 +143,10 @@ To open directory tree view:
 open-notebook .
 ```
 
-To open a jupyter notebook:
+To open a jupyter notebook (here using the short name `nopen`):
 
 ```bash
-open-notebook path/to/notebook.ipynb
+nopen path/to/notebook.ipynb
 ```
 
 To specify where the central server is running, use the `-r/--root` option. For
@@ -235,10 +240,6 @@ See the [documentation][docs-link] for further details.
 ## License
 
 This is free software. See [LICENSE][license-link].
-
-## Related work
-
-Any other stuff to metion....
 
 ## Contact
 
