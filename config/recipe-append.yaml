@@ -1,0 +1,19 @@
+test:
+  imports:
+    - open_notebook
+  commands:
+    - pip check
+  requires:
+    - pip
+
+about:
+  home: https://github.com/wpk-nist-gov/open-notebook
+  summary: Command line program to open jupyter notebooks from single server
+  description: |
+    Command line program to open jupyter notebooks from single server
+  license: NIST-PD
+  license_file: LICENSE
+
+extra:
+  recipe-maintainers:
+    - wpk-nist-gov

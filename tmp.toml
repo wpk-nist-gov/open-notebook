@@ -1,0 +1,18 @@
+# This is the config file for "open-notebook"
+#
+# These options are top level
+host = "localhost"
+port = "8888"
+root = "~/Documents"
+dir_prefix = "tree"
+file_prefix = "notebooks"
+# # You can specify other "configurations" using a section.
+# # For example, if you have the following, then calling
+# #
+# # $ open-notebook -c alt ...
+# #
+# # Will use port `8889` and root `~/Documents`, with other options inherited from base config.
+# #
+# [alt]
+# port = "8889"
+# root = "~/Documents"
