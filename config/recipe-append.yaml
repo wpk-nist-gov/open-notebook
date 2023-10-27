@@ -7,7 +7,7 @@ test:
     - pip
 
 about:
-  home: https://github.com/wpk-nist-gov/open-notebook
+  home: https://github.com/usnistgov/open-notebook
   summary: Command line program to open jupyter notebooks from single server
   description: |
     Command line program to open jupyter notebooks from single server

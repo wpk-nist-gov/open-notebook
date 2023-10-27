@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [project.urls]
-homepage = "https://github.com/wpk-nist-gov/open-notebook"
+homepage = "https://github.com/usnistgov/open-notebook"
 documentation = "https://pages.nist.gov/open-notebook/"
 
 [project.optional-dependencies]
