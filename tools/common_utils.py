@@ -3,7 +3,7 @@ from __future__ import annotations
 
 
 def get_conda_environment_map(simplify: bool = True) -> dict[str, str]:
-    """Contruct mapping from environment env_name to path"""
+    """Construct mapping from environment env_name to path"""
     import subprocess
     from pathlib import Path
 

@@ -26,8 +26,14 @@ def inside_dir(dirpath: str | Path) -> Iterator[None]:
         os.chdir(old_path)
 
 
-def run_inside_dir(command: str, dirpath: str | Path) -> int:
+def run_inside_dir(
+    command: str, dirpath: str | Path | None = None
+) -> subprocess.CompletedProcess[bytes]:
     """Run a command from inside a given directory, returning the exit status"""
+
+    if dirpath is None:
+        dirpath = Path(".")
+
     with inside_dir(dirpath):
         logger.info(f"Run: {command}")
-        return subprocess.check_call(shlex.split(command))
+        return subprocess.run(shlex.split(command), check=True, stdout=subprocess.PIPE)

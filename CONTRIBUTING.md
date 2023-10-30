@@ -8,7 +8,7 @@ You can contribute in many ways:
 ## Types of Contributions
 
 <!-- prettier-ignore-start -->
-[issues]: https://github.com/wpk-nist-gov/open-notebook/issues
+[issues]: https://github.com/usnistgov/open-notebook/issues
 <!-- prettier-ignore-end -->
 
 ### Report Bugs
@@ -444,7 +444,7 @@ that, please use nox.
 [conventional-style]: https://www.conventionalcommits.org/en/v1.0.0/
 [commitizen]: https://github.com/commitizen-tools/commitizen
 [nb_conda_kernels]: https://github.com/Anaconda-Platform/nb_conda_kernels
-[pyproject2conda]: https://github.com/wpk-nist-gov/pyproject2conda
+[pyproject2conda]: https://github.com/usnistgov/pyproject2conda
 [nbqa]: https://github.com/nbQA-dev/nbQA
 [pyright]: https://github.com/microsoft/pyright
 

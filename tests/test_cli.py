@@ -9,6 +9,8 @@ from pathlib import Path
 from open_notebook import cli
 from open_notebook.utils import MISSING
 
+from .utils import run_inside_dir
+
 import shlex
 
 if TYPE_CHECKING:
@@ -237,3 +239,16 @@ def test_create_config2(example_path: Path) -> None:
 def test_open(example_path: Path) -> None:
     cli.main(args=["-r", ".", ".", "a/b", "--dry"])
     cli.main(args=["--version"])
+
+
+def test_run(example_path: Path) -> None:
+    from open_notebook import __version__
+
+    for s in [
+        "open-notebook --version",
+        "nopen --version",
+    ]:
+        out = run_inside_dir(s)
+
+        assert out.returncode == 0
+        assert out.stdout.decode().strip() == f"open-notebook, {__version__}"

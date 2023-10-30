@@ -1,4 +1,4 @@
-"""Unitilities to use with cog"""
+"""Utilities to use with cog"""
 
 from __future__ import annotations
 
