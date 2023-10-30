@@ -102,27 +102,28 @@ options:
   -h, --help            show this help message and exit
   --host HOST           Host name (default='localhost')
   -p PORT, --port PORT  Port (default='8888')
-  -r ROOT, --root ROOT  Directory servers was started in. Defaults to current working directory.
+  -r ROOT, --root ROOT  Directory servers was started in. Defaults to current working
+                        directory.
   --dir-prefix DIR_PREFIX
                         Directory prefix (default='tree')
   --file-prefix FILE_PREFIX
                         File prefix (default='notebooks')
   --reset
   -c CONFIG, --config CONFIG
-                        Config style to use. This is the name of a header in one of the config
-                        files.
+                        Config style to use. This is the name of a header in one of the
+                        config files.
   --create-config       If passed, create .open-notebook.ini
-  --overwrite           Pass to overwrite `~/.open-notebook.toml` if it exists with `--create-
-                        config`
+  --overwrite           Pass to overwrite `~/.open-notebook.toml` if it exists with
+                        `--create-config`
   --version             Print out program version
   -v, --verbose         Set verbosity level. Can pass multiple times.
   --dry                 Dry run.
 
-You can set options with the configuration files ".open-notebook.toml". Configuration files are
-found in the current directory, git root (if in a git tracked tree), and the home directory. Note
-that all these files are considered, in order. That is, you could override a single value in the
-current directory, and the rest would be inherited from, in order, git root and then the home
-directory.
+You can set options with the configuration files ".open-notebook.toml". Configuration
+files are found in the current directory, git root (if in a git tracked tree), and the
+home directory. Note that all these files are considered, in order. That is, you could
+override a single value in the current directory, and the rest would be inherited from,
+in order, git root and then the home directory.
 ```
 
 <!-- [[[end]]] -->
