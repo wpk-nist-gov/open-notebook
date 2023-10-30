@@ -3,6 +3,8 @@ test:
     - open_notebook
   commands:
     - pip check
+    - open-notebook --help
+    - nopen --help
   requires:
     - pip
 
