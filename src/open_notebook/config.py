@@ -32,7 +32,7 @@ DEFAULT_PARAMS = {
 
 def get_git_root_path(cwd: str | Path | None = None) -> Path | None:
     if cwd:
-        cwd = Path(cwd).expanduser()
+        cwd = Path(cwd).expanduser().absolute()
     result = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"], capture_output=True, cwd=cwd
     )

@@ -357,11 +357,23 @@ def _test(
     test_opts: list[str],
     no_cov: bool,
 ) -> None:
+    import os
+
+    tmpdir = os.environ.get("TMPDIR", None)
+
     session_run_commands(session, run)
     if not test_no_pytest:
         opts = combine_list_str(test_opts)
         if not no_cov:
             session.env["COVERAGE_FILE"] = str(Path(session.create_tmp()) / ".coverage")
+
+            # Because we are testing if temporary folders
+            # have git or not, we have to make sure we're above the
+            # not under this repo
+            # so revert to using the top level `TMPDIR`
+            if tmpdir:
+                session.env["TMPDIR"] = tmpdir
+
             if "--cov" not in opts:
                 opts.append("--cov")
         session.run("pytest", *opts)
