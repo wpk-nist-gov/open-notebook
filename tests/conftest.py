@@ -16,12 +16,12 @@ if TYPE_CHECKING:
     YieldFixture = Generator[T, None, None]
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def home_path() -> Path:
     return Path(__file__).parent.absolute() / "data"
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def example_path(tmp_path: Path) -> YieldFixture[Path]:
     other_dir = tmp_path / "a" / "b"
     other_dir.mkdir(parents=True)
@@ -29,12 +29,15 @@ def example_path(tmp_path: Path) -> YieldFixture[Path]:
     # change to example_path
     old_cwd = Path.cwd()
     os.chdir(tmp_path)
+
+    assert Path.cwd().absolute() == tmp_path.absolute()
+
     yield tmp_path.absolute()
     # Cleanup?
     os.chdir(old_cwd)
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def example_path_with_config(example_path: Path) -> YieldFixture[Path]:
     config.create_config(
         host="thing",
@@ -49,14 +52,14 @@ def example_path_with_config(example_path: Path) -> YieldFixture[Path]:
     yield example_path
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def example_path_with_git(example_path: Path) -> YieldFixture[Path]:
     run_inside_dir("git init", example_path)
 
     yield example_path
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def example_path_with_git_config(
     example_path_with_config: Path, example_path_with_git: Path
 ) -> YieldFixture[Path]:

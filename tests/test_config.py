@@ -51,6 +51,33 @@ def test_base() -> None:
     assert base_options(file_prefix="no") == c.to_options_dict(file_prefix="no")
 
 
+def test_git_root(example_path: Path) -> None:
+    assert Path.cwd() == example_path
+
+    assert config.get_git_root_path() is None
+
+
+def test_git_root_config(example_path_with_config: Path) -> None:
+    p = example_path_with_config
+    assert Path.cwd() == p
+
+    assert config.get_git_root_path() is None
+
+
+def test_git_root_git(example_path_with_git: Path) -> None:
+    p = example_path_with_git
+    assert Path.cwd() == p
+
+    assert config.get_git_root_path() == p
+
+
+def test_git_root_git_config(example_path_with_git_config: Path) -> None:
+    p = example_path_with_git_config
+    assert Path.cwd() == p
+
+    assert config.get_git_root_path() == p
+
+
 def test_find_config(example_path: Path, home_path: Path) -> None:
     out = config.get_config_files(home=home_path)
 

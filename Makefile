@@ -288,5 +288,5 @@ pytest-nbval:  ## run pytest --nbval
 
 .PHONY: cog-readme
 cog-readme: ## apply cog to README.md
-	COLUMNS=100 cog -rP README.md
+	COLUMNS=90 cog -rP README.md
 	pre-commit run markdownlint --files README.md
