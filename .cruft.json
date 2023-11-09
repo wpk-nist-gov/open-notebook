@@ -1,7 +1,7 @@
 {
-  "template": "https://github.com/usnistgov/cookiecutter-nist-python.git",
+  "template": "https://github.com/wpk-nist-gov/cookiecutter-nist-python.git",
   "commit": "b1bda8405873534ef5a143e1163bfb0d7dca72bc",
-  "checkout": "develop",
+  "checkout": "feature/add-copier",
   "context": {
     "cookiecutter": {
       "full_name": "William P. Krekelberg",
@@ -16,6 +16,8 @@
       "command_line_interface": "Argparse",
       "sphinx_use_autodocsumm": "y",
       "sphinx_theme": "sphinx_book_theme",
+      "__year": "2023",
+      "__answers": "",
       "_template": "https://github.com/wpk-nist-gov/cookiecutter-nist-python.git"
     }
   },
