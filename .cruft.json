@@ -1,6 +1,6 @@
 {
   "template": "https://github.com/usnistgov/cookiecutter-nist-python.git",
-  "commit": "ab2f71c9e76533931d52cd32c7091fce972f7626",
+  "commit": "b1bda8405873534ef5a143e1163bfb0d7dca72bc",
   "checkout": "develop",
   "context": {
     "cookiecutter": {
@@ -11,21 +11,12 @@
       "conda_channel": "conda-forge",
       "project_name": "open-notebook",
       "project_slug": "open_notebook",
-      "_copy_without_render": [
-        "*.html",
-        "docs/_templates/*.rst",
-        "docs/_templates/autosummary/*.rst",
-        "docs/_templates/autodocsumm/*.rst",
-        "docs/_static/css/*",
-        "docs/_static/js/*",
-        "changelog.d/templates/*.j2",
-        "changelog.d/templates/auto-changelog/*.jinja2"
-      ],
+      "_copy_without_render": [],
       "project_short_description": "Command line program to open jupyter notebooks from single server",
       "command_line_interface": "Argparse",
       "sphinx_use_autodocsumm": "y",
       "sphinx_theme": "sphinx_book_theme",
-      "_template": "https://github.com/usnistgov/cookiecutter-nist-python.git"
+      "_template": "https://github.com/wpk-nist-gov/cookiecutter-nist-python.git"
     }
   },
   "directory": null
