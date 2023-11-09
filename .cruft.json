@@ -1,6 +1,6 @@
 {
   "template": "https://github.com/wpk-nist-gov/cookiecutter-nist-python.git",
-  "commit": "b1bda8405873534ef5a143e1163bfb0d7dca72bc",
+  "commit": "79627e8bcb0dcb3e9635753edda4770838327986",
   "checkout": "feature/add-copier",
   "context": {
     "cookiecutter": {
