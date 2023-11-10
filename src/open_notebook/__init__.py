@@ -7,7 +7,7 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _version
 
 try:
-    __version__ = _version("open_notebook")
+    __version__ = _version("open-notebook")
 except PackageNotFoundError:  # pragma: no cover
     __version__ = "999"
 
