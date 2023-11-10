@@ -1,7 +1,7 @@
 {
-  "template": "https://github.com/wpk-nist-gov/cookiecutter-nist-python.git",
+  "template": "https://github.com/usnistgov/cookiecutter-nist-python.git",
   "commit": "a7672e135dcff871c3a12ef0f2d9d7ece8d08c97",
-  "checkout": "feature/update-template",
+  "checkout": "develop",
   "context": {
     "cookiecutter": {
       "project_name": "open-notebook",
