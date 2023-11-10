@@ -1,7 +1,7 @@
 {
-  "template": "https://github.com/usnistgov/cookiecutter-nist-python.git",
-  "commit": "79627e8bcb0dcb3e9635753edda4770838327986",
-  "checkout": "develop",
+  "template": "https://github.com/wpk-nist-gov/cookiecutter-nist-python.git",
+  "commit": "e84f5884bfaa90e9397f41549b621ecacf747a3f",
+  "checkout": "feature/update-template",
   "context": {
     "cookiecutter": {
       "full_name": "William P. Krekelberg",
@@ -13,10 +13,10 @@
       "project_slug": "open_notebook",
       "_copy_without_render": [],
       "project_short_description": "Command line program to open jupyter notebooks from single server",
-      "command_line_interface": "Argparse",
-      "sphinx_use_autodocsumm": "y",
+      "command_line_interface": "argparse",
+      "sphinx_use_autodocsumm": true,
       "sphinx_theme": "sphinx_book_theme",
-      "__year": "2023",
+      "year": "2023",
       "__answers": "",
       "_template": "https://github.com/wpk-nist-gov/cookiecutter-nist-python.git"
     }
