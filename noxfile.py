@@ -117,27 +117,46 @@ CMD_OPT = Option(nargs="*", type=str, help="cmd to be run")
 LOCK_OPT = Option(type=bool, help="If True, use conda-lock")
 
 
-ListStr = "list[str] | None"
-ListListStr = "list[list[str]] | None"
+OPT_TYPE: TypeAlias = list[str] | None
+CMD_TYPE: TypeAlias = list[str] | None
+RUN_TYPE: TypeAlias = list[list[str]] | None
 
 
-def opts_annotated(**kwargs: Any):  # type: ignore[unused-ignore,no-untyped-def]
-    return Annotated["list[str] | None", replace(OPTS_OPT, **kwargs)]
+# def opts_annotated(**kwargs: Any):  # type: ignore[unused-ignore,no-untyped-def]
+#     return Annotated["list[str] | None", replace(OPTS_OPT, **kwargs)]
+
+# def cmd_annotated(**kwargs: Any):  # type: ignore[unused-ignore,no-untyped-def]
+#     return Annotated["list[str] | None", replace(CMD_OPT, **kwargs)]
+
+# def run_annotated(**kwargs: Any):  # type: ignore[unused-ignore,no-untyped-def]
+#     return Annotated["list[list[str]] | None", replace(RUN_OPT, **kwargs)]
 
 
-def cmd_annotated(**kwargs: Any):  # type: ignore[unused-ignore,no-untyped-def]
-    return Annotated["list[str] | None", replace(CMD_OPT, **kwargs)]
+def opts_replace(**kwargs: Any) -> Option:
+    return replace(OPTS_OPT, **kwargs)
 
 
-def run_annotated(**kwargs: Any):  # type: ignore[unused-ignore,no-untyped-def]
-    return Annotated["list[list[str]] | None", replace(RUN_OPT, **kwargs)]
+def cmd_replace(**kwargs: Any) -> Option:
+    return replace(CMD_OPT, **kwargs)
+
+
+def run_replace(**kwargs: Any) -> Option:
+    return replace(RUN_OPT, **kwargs)
 
 
 LOCK_CLI = Annotated[bool, LOCK_OPT]
-RUN_CLI = Annotated["list[list[str]] | None", RUN_OPT]
-TEST_OPTS_CLI = opts_annotated(help="extra arguments/flags to pytest")
-DEV_EXTRAS_CLI = cmd_annotated(help="extras included in user dev environment")
-PYTHON_PATHS_CLI = cmd_annotated(help="python paths to append to PATHS")
+RUN_CLI = Annotated[RUN_TYPE, RUN_OPT]
+RUN_INTERNAL_CLI = Annotated[
+    RUN_TYPE, run_replace(help="run arbitrary internal command")
+]
+
+TEST_OPTS_CLI = Annotated[
+    OPT_TYPE, opts_replace(help="extra arguments/flags to pytest")
+]
+EXTRAS_CLI = Annotated[OPT_TYPE, cmd_replace(help="extras to include from package")]
+PYTHON_PATHS_CLI = Annotated[
+    OPT_TYPE, cmd_replace(help="python paths to append to PATHS")
+]
 
 UPDATE_CLI = Annotated[
     bool,
@@ -147,7 +166,6 @@ UPDATE_CLI = Annotated[
         flags=("--update", "-U"),
     ),
 ]
-
 
 UPDATE_PACKAGE_CLI = Annotated[
     bool,
@@ -171,23 +189,44 @@ LOG_SESSION_CLI = Annotated[
 ]
 
 
+DOC_CMD_CLI = Annotated[
+    CMD_TYPE,
+    cmd_replace(
+        choices=[
+            "html",
+            "build",
+            "symlink",
+            "clean",
+            "livehtml",
+            "linkcheck",
+            "spelling",
+            "showlinks",
+            "release",
+            "open",
+            "serve",
+        ],
+        flags=("--docs-cmd", "-d"),
+    ),
+]
+
+
+DIST_PYPI_CMD_CLI = Annotated[
+    CMD_TYPE,
+    cmd_replace(
+        choices=["clean", "build", "testrelease", "release"],
+        flags=("--dist-pypi-cmd", "-p"),
+    ),
+]
+
+
 # * Environments------------------------------------------------------------------------
 # ** Dev (conda)
-
-
-@NOPYTHON_SESSION
-def example(
-    session: Session,
-    example_run: RUN_CLI = [],
-) -> None:
-    print(type(example_run))
-    print(example_run)
 
 
 @DEFAULT_SESSION
 def dev(
     session: Session,
-    dev_run: RUN_CLI = [],  # noqa
+    dev_run: RUN_CLI = None,
     lock: LOCK_CLI = False,
     update: UPDATE_CLI = False,
     update_package: UPDATE_PACKAGE_CLI = False,
@@ -210,7 +249,7 @@ def dev(
 @DEFAULT_SESSION_VENV
 def dev_venv(
     session: Session,
-    dev_run: RUN_CLI = [],  # noqa
+    dev_run: RUN_CLI = None,
     lock: LOCK_CLI = False,
     update: UPDATE_CLI = False,
     update_package: UPDATE_PACKAGE_CLI = False,
@@ -246,8 +285,8 @@ def bootstrap(session: Session) -> None:
 @NOPYTHON_SESSION
 def config(
     session: Session,
-    dev_extras: DEV_EXTRAS_CLI = [],  # type: ignore # noqa
-    python_paths: PYTHON_PATHS_CLI = [],  # type: ignore # noqa
+    dev_extras: EXTRAS_CLI = None,
+    python_paths: PYTHON_PATHS_CLI = None,
 ) -> None:
     """Create the file ./config/userconfig.toml"""
 
@@ -304,15 +343,20 @@ def requirements(
 def conda_lock(
     session: Session,
     update: UPDATE_CLI = False,
-    conda_lock_channel: cmd_annotated(help="conda channels to use") = (),  # type: ignore
-    conda_lock_platform: cmd_annotated(  # type: ignore
-        help="platforms to build lock files for",
-        choices=["osx-64", "linux-64", "win-64", "all"],
-    ) = (),
-    conda_lock_include: cmd_annotated(  # type: ignore
-        help="lock files to create",
-    ) = (),
-    conda_lock_run: RUN_CLI = [],  # noqa
+    conda_lock_channel: Annotated[
+        OPT_TYPE, opts_replace(help="conda channels to use")
+    ] = None,
+    conda_lock_platform: Annotated[
+        OPT_TYPE,
+        opts_replace(
+            help="platforms to build lock files for",
+            choices=["osx-64", "linux-64", "win-64", "all"],
+        ),
+    ] = None,
+    conda_lock_include: Annotated[
+        OPT_TYPE, opts_replace(help="lock files to create")
+    ] = None,
+    conda_lock_run: RUN_CLI = None,  # noqa
     conda_lock_mamba: bool = False,
     conda_lock_force: bool = False,
 ) -> None:
@@ -329,12 +373,14 @@ def conda_lock(
     session.run("conda-lock", "--version")
 
     conda_lock_exclude = ["test-extras"]
-    platform = cast(Sequence[str], conda_lock_platform)
+
+    platform = conda_lock_platform
     if not platform:
         platform = ["osx-64"]
     elif "all" in platform:
         platform = ["linux-64", "osx-64", "win-64"]
-    channel = cast(Sequence[str], conda_lock_channel)
+
+    channel = conda_lock_channel
     if not channel:
         channel = ["conda-forge"]
 
@@ -379,9 +425,9 @@ def conda_lock(
 # ** testing
 def _test(
     session: nox.Session,
-    run: list[list[str]],
+    run: RUN_TYPE,
     test_no_pytest: bool,
-    test_opts: list[str],
+    test_opts: OPT_TYPE,
     no_cov: bool,
 ) -> None:
     import os
@@ -390,7 +436,7 @@ def _test(
 
     session_run_commands(session, run)
     if not test_no_pytest:
-        opts = combine_list_str(test_opts)
+        opts = combine_list_str(test_opts or [])
         if not no_cov:
             session.env["COVERAGE_FILE"] = str(Path(session.create_tmp()) / ".coverage")
 
@@ -411,8 +457,8 @@ def _test(
 def test(
     session: Session,
     test_no_pytest: bool = False,
-    test_opts: TEST_OPTS_CLI = (),  # type: ignore
-    test_run: RUN_CLI = [],  # noqa
+    test_opts: TEST_OPTS_CLI = None,
+    test_run: RUN_CLI = None,
     lock: LOCK_CLI = False,
     update: UPDATE_CLI = False,
     update_package: UPDATE_PACKAGE_CLI = False,
@@ -444,9 +490,9 @@ def test(
 def test_venv(
     session: Session,
     test_no_pytest: bool = False,
-    test_opts: TEST_OPTS_CLI = (),  # type: ignore
-    test_run: RUN_CLI = [],  # noqa
-    lock: LOCK_CLI = False,  # pyright: ignore
+    test_opts: TEST_OPTS_CLI = None,
+    test_run: RUN_CLI = None,
+    lock: LOCK_CLI = False,
     update: UPDATE_CLI = False,
     update_package: UPDATE_PACKAGE_CLI = False,
     log_session: bool = False,
@@ -464,16 +510,6 @@ def test_venv(
         ).install_all(update_package=update_package, log_session=log_session)
     )
 
-    # pkg_install_venv(
-    #     session=session,
-    #     name="test-venv",
-    #     install_package=True,
-    #     requirement_paths="test.txt",
-    #     update=update,
-    #     update_package=update_package,
-    #     log_session=log_session,
-    # )
-
     _test(
         session=session,
         run=test_run,
@@ -486,11 +522,14 @@ def test_venv(
 # ** coverage
 def _coverage(
     session: nox.Session,
-    run: list[list[str]],
-    cmd: list[str],
-    run_internal: list[list[str]],
+    run: RUN_TYPE,
+    cmd: CMD_TYPE,
+    run_internal: RUN_TYPE,
 ) -> None:
     session_run_commands(session, run)
+
+    if cmd is None:
+        cmd = []
 
     if not cmd and not run and not run_internal:
         cmd = ["combine", "html"]
@@ -509,19 +548,18 @@ def _coverage(
         else:
             session.run("coverage", c)
 
+    session_run_commands(session, run)
     session_run_commands(session, run_internal, external=False)
 
 
 @INHERITED_SESSION_VENV
 def coverage(
     session: Session,
-    coverage_cmd: cmd_annotated(  # type: ignore
-        choices=["erase", "combine", "report", "html", "open"]
-    ) = (),
-    coverage_run: RUN_CLI = [],  # noqa
-    coverage_run_internal: run_annotated(  # type: ignore
-        help="Arbitrary commands to run within the session"
-    ) = [],  # noqa
+    coverage_cmd: Annotated[
+        CMD_TYPE, cmd_replace(choices=["erase", "combine", "report", "html", "open"])
+    ] = None,
+    coverage_run: RUN_CLI = None,
+    coverage_run_internal: RUN_CLI = None,
     update: UPDATE_CLI = False,
 ) -> None:
     (
@@ -530,30 +568,22 @@ def coverage(
         ).install_all()
     )
 
-    # pkg_install_venv(
-    #     session,
-    #     name="coverage",
-    #     reqs=["coverage[toml]"],
-    #     update=update,
-    # )
-
     _coverage(
         session=session,
         run=coverage_run,
-        cmd=cast(list[str], coverage_cmd),
-        run_internal=cast(list[list[str]], coverage_run_internal),
+        cmd=coverage_cmd,
+        run_internal=coverage_run_internal,
     )
 
 
 # ** Docs
-def _docs(
-    session: nox.Session, run: list[list[str]], cmd: list[str], version: str
-) -> None:
+def _docs(session: nox.Session, run: RUN_TYPE, cmd: CMD_TYPE, version: str) -> None:
     if version:
         session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = version
 
     session_run_commands(session, run)
 
+    cmd = cmd or []
     if not run and not cmd:
         cmd = ["html"]
 
@@ -591,23 +621,8 @@ def _docs(
 @DEFAULT_SESSION
 def docs(
     session: nox.Session,
-    docs_cmd: cmd_annotated(  # type: ignore
-        choices=[
-            "html",
-            "build",
-            "symlink",
-            "clean",
-            "livehtml",
-            "linkcheck",
-            "spelling",
-            "showlinks",
-            "release",
-            "open",
-            "serve",
-        ],
-        flags=("--docs-cmd", "-d"),
-    ) = (),
-    docs_run: RUN_CLI = [],  # noqa
+    docs_cmd: DOC_CMD_CLI = None,
+    docs_run: RUN_CLI = None,
     lock: LOCK_CLI = False,
     update: UPDATE_CLI = False,
     update_package: UPDATE_PACKAGE_CLI = False,
@@ -624,42 +639,14 @@ def docs(
         .set_ipykernel_display_name(f"{PACKAGE_NAME}-docs")
     )
 
-    # pkg_install_condaenv(
-    #     session=session,
-    #     name="docs",
-    #     lock=lock,
-    #     display_name=f"{PACKAGE_NAME}-docs",
-    #     install_package=True,
-    #     update=update,
-    #     update_package=update_package,
-    #     log_session=log_session,
-    # )
-
-    _docs(
-        session=session, cmd=docs_cmd, run=docs_run, version=version  # pyright: ignore
-    )
+    _docs(session=session, cmd=docs_cmd, run=docs_run, version=version)
 
 
 @DEFAULT_SESSION_VENV
 def docs_venv(
     session: nox.Session,
-    docs_cmd: cmd_annotated(  # type: ignore
-        choices=[
-            "html",
-            "build",
-            "symlink",
-            "clean",
-            "livehtml",
-            "linkcheck",
-            "spelling",
-            "showlinks",
-            "release",
-            "open",
-            "serve",
-        ],
-        flags=("--docs-cmd", "-d"),
-    ) = (),
-    docs_run: RUN_CLI = [],  # noqa
+    docs_cmd: DOC_CMD_CLI = None,
+    docs_run: RUN_CLI = None,
     lock: LOCK_CLI = False,
     update: UPDATE_CLI = False,
     update_package: UPDATE_PACKAGE_CLI = False,
@@ -679,26 +666,12 @@ def docs_venv(
         # .set_ipykernel_display_name(f"{PACKAGE_NAME}-docs")
     )
 
-    # pkg_install_venv(
-    #     session=session,
-    #     name="docs-venv",
-    #     lock=lock,
-    #     display_name=f"{PACKAGE_NAME}-docs-venv",
-    #     install_package=True,
-    #     update=update,
-    #     update_package=update_package,
-    #     log_session=log_session,
-    #     requirement_paths="docs.txt",
-    # )
-
-    _docs(
-        session=session, cmd=docs_cmd, run=docs_run, version=version  # pyright: ignore
-    )
+    _docs(session=session, cmd=docs_cmd, run=docs_run, version=version)
 
 
 # ** Dist pypi
 def _dist_pypi(
-    session: nox.Session, run: list[list[str]], cmd: list[str], version: str
+    session: nox.Session, run: RUN_TYPE, cmd: CMD_TYPE, version: str
 ) -> None:
     if version:
         session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = version
@@ -728,12 +701,8 @@ def _dist_pypi(
 @DEFAULT_SESSION_VENV
 def dist_pypi(
     session: nox.Session,
-    dist_pypi_run: RUN_CLI = [],  # noqa
-    dist_pypi_cmd: cmd_annotated(  # type: ignore
-        choices=["clean", "build", "testrelease", "release"],
-        flags=("--dist-pypi-cmd", "-p"),
-    ) = (),
-    lock: LOCK_CLI = False,  # pyright: ignore
+    dist_pypi_run: RUN_CLI = None,
+    dist_pypi_cmd: DIST_PYPI_CMD_CLI = None,
     update: UPDATE_CLI = False,
     version: VERSION_CLI = "",
     log_session: bool = False,
@@ -748,19 +717,10 @@ def dist_pypi(
         ).install_all(log_session=log_session)
     )
 
-    # pkg_install_venv(
-    #     session=session,
-    #     name="dist-pypi",
-    #     requirement_paths="dist-pypi.txt",
-    #     update=update,
-    #     install_package=False,
-    #     log_session=log_session,
-    # )
-
     _dist_pypi(
         session=session,
         run=dist_pypi_run,
-        cmd=dist_pypi_cmd,  # pyright: ignore
+        cmd=dist_pypi_cmd,
         version=version,
     )
 
@@ -768,12 +728,8 @@ def dist_pypi(
 @DEFAULT_SESSION
 def dist_pypi_condaenv(
     session: nox.Session,
-    dist_pypi_run: RUN_CLI = [],  # noqa
-    dist_pypi_cmd: cmd_annotated(  # type: ignore
-        choices=["clean", "build", "testrelease", "release"],
-        flags=("--dist-pypi-cmd", "-p"),
-    ) = (),
-    lock: LOCK_CLI = False,  # pyright: ignore
+    dist_pypi_run: RUN_CLI = None,
+    dist_pypi_cmd: DIST_PYPI_CMD_CLI = None,
     update: UPDATE_CLI = False,
     version: VERSION_CLI = "",
     log_session: bool = False,
@@ -789,18 +745,10 @@ def dist_pypi_condaenv(
         ).install_all(log_session=log_session)
     )
 
-    # pkg_install_condaenv(
-    #     session=session,
-    #     name="dist-pypi",
-    #     install_package=False,
-    #     update=update,
-    #     log_session=log_session,
-    # )
-
     _dist_pypi(
         session=session,
         run=dist_pypi_run,
-        cmd=dist_pypi_cmd,  # pyright: ignore
+        cmd=dist_pypi_cmd,
         version=version,
     )
 
@@ -809,19 +757,21 @@ def dist_pypi_condaenv(
 @DEFAULT_SESSION
 def dist_conda(
     session: nox.Session,
-    dist_conda_run: RUN_CLI = [],  # noqa
-    dist_conda_cmd: cmd_annotated(  # type: ignore
-        choices=[
-            "recipe",
-            "build",
-            "clean",
-            "clean-recipe",
-            "clean-build",
-            "recipe-cat-full",
-        ],
-        flags=("--dist-conda-cmd", "-c"),
-    ) = (),
-    # lock: LOCK_CLI = False,
+    dist_conda_run: RUN_CLI = None,
+    dist_conda_cmd: Annotated[
+        CMD_TYPE,
+        cmd_replace(
+            choices=[
+                "recipe",
+                "build",
+                "clean",
+                "clean-recipe",
+                "clean-build",
+                "recipe-cat-full",
+            ],
+            flags=("--dist-conda-cmd", "-c"),
+        ),
+    ] = None,
     sdist_path: str = "",
     update: UPDATE_CLI = False,
     log_session: bool = False,
@@ -833,17 +783,7 @@ def dist_conda(
         session=session, base_name="dist-conda", update=update
     ).install_all(log_session=log_session)
 
-    # pkg_install_condaenv(
-    #     session=session,
-    #     name="dist-conda",
-    #     install_package=False,
-    #     update=update,
-    #     log_session=log_session,
-    # )
-
-    run = dist_conda_run
-    cmd = cast("list[str]", dist_conda_cmd)
-
+    run, cmd = dist_conda_run, dist_conda_cmd
     runner.run_commands(run)
 
     if not run and not cmd:
@@ -924,7 +864,7 @@ def dist_conda(
 @INHERITED_SESSION_VENV
 def lint(
     session: nox.Session,
-    lint_run: RUN_CLI = [],  # noqa
+    lint_run: RUN_CLI = None,
     update: UPDATE_CLI = False,
     log_session: bool = False,
 ) -> None:
@@ -940,15 +880,6 @@ def lint(
         session=session, pip_deps="pre-commit", update=update
     ).install_all(log_session=log_session)
 
-    # pkg_install_venv(
-    #     session=session,
-    #     name="lint",
-    #     reqs=["pre-commit"],
-    #     install_package=False,
-    #     update=update,
-    #     log_session=log_session,
-    # )
-
     if lint_run:
         runner.run_commands(lint_run, external=True)
     else:
@@ -958,11 +889,13 @@ def lint(
 # ** type checking
 def _typing(
     session: nox.Session,
-    run: list[list[str]],
-    cmd: list[str],
-    run_internal: list[list[str]],
+    run: RUN_TYPE,
+    cmd: CMD_TYPE,
+    run_internal: RUN_TYPE,
 ) -> None:
     session_run_commands(session, run)
+
+    cmd = cmd or []
     if not run and not run_internal and not cmd:
         cmd = ["mypy", "pyright"]
 
@@ -1001,10 +934,9 @@ def _typing(
     session_run_commands(session, run_internal, external=False)
 
 
-@ALL_SESSION
-def typing(
-    session: nox.Session,
-    typing_cmd: cmd_annotated(  # type: ignore
+TYPING_CMD_CLI = Annotated[
+    CMD_TYPE,
+    cmd_replace(
         choices=[
             "clean",
             "mypy",
@@ -1016,11 +948,16 @@ def typing(
             "nbqa-typing",
         ],
         flags=("--typing-cmd", "-m"),
-    ) = (),
-    typing_run: RUN_CLI = [],  # noqa
-    typing_run_internal: run_annotated(  # type: ignore
-        help="run arbitrary (internal) commands.  For example, --typing-run-internal 'mypy --some-option'",
-    ) = [],  # noqa
+    ),
+]
+
+
+@ALL_SESSION
+def typing(
+    session: nox.Session,
+    typing_cmd: TYPING_CMD_CLI = None,
+    typing_run: RUN_CLI = None,
+    typing_run_internal: RUN_INTERNAL_CLI = None,
     lock: LOCK_CLI = False,
     update: UPDATE_CLI = False,
     log_session: bool = False,
@@ -1036,43 +973,20 @@ def typing(
         ).install_all(log_session=log_session)
     )
 
-    # pkg_install_condaenv(
-    #     session=session,
-    #     name="typing",
-    #     lock=lock,
-    #     install_package=False,
-    #     update=update,
-    #     log_session=log_session,
-    # )
-
     _typing(
         session=session,
         run=typing_run,
-        cmd=typing_cmd,  # pyright: ignore
-        run_internal=typing_run_internal,  # pyright: ignore
+        cmd=typing_cmd,
+        run_internal=typing_run_internal,
     )
 
 
 @ALL_SESSION_VENV
 def typing_venv(
     session: nox.Session,
-    typing_cmd: cmd_annotated(  # type: ignore
-        choices=[
-            "clean",
-            "mypy",
-            "pyright",
-            "pytype",
-            "all",
-            "nbqa-mypy",
-            "nbqa-pyright",
-            "nbqa-typing",
-        ],
-        flags=("--typing-cmd", "-m"),
-    ) = (),
-    typing_run: RUN_CLI = [],  # noqa
-    typing_run_internal: run_annotated(  # type: ignore
-        help="run arbitrary (internal) commands.  For example, --typing-run-internal 'mypy --some-option'",
-    ) = [],  # noqa
+    typing_cmd: TYPING_CMD_CLI = None,
+    typing_run: RUN_CLI = None,
+    typing_run_internal: RUN_INTERNAL_CLI = None,
     lock: LOCK_CLI = False,
     update: UPDATE_CLI = False,
     log_session: bool = False,
@@ -1091,8 +1005,8 @@ def typing_venv(
     _typing(
         session=session,
         run=typing_run,
-        cmd=typing_cmd,  # pyright: ignore
-        run_internal=typing_run_internal,  # pyright: ignore
+        cmd=typing_cmd,
+        run_internal=typing_run_internal,
     )
 
 
@@ -1101,8 +1015,8 @@ def typing_venv(
 def testdist_conda(
     session: Session,
     test_no_pytest: bool = False,
-    test_opts: TEST_OPTS_CLI = (),  # type: ignore
-    testdist_conda_run: RUN_CLI = [],  # noqa
+    test_opts: TEST_OPTS_CLI = None,
+    testdist_conda_run: RUN_CLI = None,
     update: UPDATE_CLI = False,
     version: VERSION_CLI = "",
     log_session: bool = False,
@@ -1137,17 +1051,16 @@ def testdist_conda(
 def testdist_pypi(
     session: Session,
     test_no_pytest: bool = False,
-    test_opts: TEST_OPTS_CLI = (),  # type: ignore
-    testdist_pypi_run: RUN_CLI = [],  # noqa
-    testdist_pypi_extras: cmd_annotated(help="extras to install") = (),  # type: ignore
+    test_opts: TEST_OPTS_CLI = None,
+    testdist_pypi_run: RUN_CLI = None,
+    testdist_pypi_extras: EXTRAS_CLI = None,
     update: UPDATE_CLI = False,
     version: VERSION_CLI = "",
     log_session: bool = False,
 ) -> None:
     """Test pypi distribution."""
-    extras = cast("list[str]", testdist_pypi_extras)
+    extras = testdist_pypi_extras
     install_str = PACKAGE_NAME
-
     if extras:
         install_str = "{}[{}]".format(install_str, ",".join(extras))
 
@@ -1176,15 +1089,15 @@ def testdist_pypi(
 def testdist_pypi_condaenv(
     session: Session,
     test_no_pytest: bool = False,
-    test_opts: TEST_OPTS_CLI = (),  # type: ignore
-    testdist_pypi_run: RUN_CLI = [],  # noqa
-    testdist_pypi_extras: cmd_annotated(help="extras to install") = (),  # type: ignore
+    test_opts: TEST_OPTS_CLI = None,
+    testdist_pypi_run: RUN_CLI = None,
+    testdist_pypi_extras: EXTRAS_CLI = None,
     update: UPDATE_CLI = False,
     version: VERSION_CLI = "",
     log_session: bool = False,
 ) -> None:
     """Test pypi distribution."""
-    extras = cast("list[str]", testdist_pypi_extras)
+    extras = testdist_pypi_extras
     install_str = PACKAGE_NAME
 
     if extras:

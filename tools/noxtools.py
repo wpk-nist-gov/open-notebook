@@ -208,7 +208,7 @@ class InstallerVenv:
     # Smart runners
     def run_commands(
         self,
-        commands: Iterable[str | Iterable[str]],
+        commands: Iterable[str | Iterable[str]] | None,
         external: bool = True,
         **kwargs: Any,
     ) -> Self:
