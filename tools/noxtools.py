@@ -110,6 +110,12 @@ def _verify_paths(
     ]
 
 
+def _is_conda_session(session: Session) -> bool:
+    from nox.virtualenv import CondaEnv
+
+    return isinstance(session.virtualenv, CondaEnv)
+
+
 # * Main class ----------------------------------------------------------------
 
 
@@ -370,7 +376,7 @@ class InstallerVenv:
     def from_params(
         cls,
         session: Session,
-        base_name: str | None,
+        base_name: str | None = None,
         lock: bool = False,
         **kwargs: Any,
     ) -> Self:
@@ -574,24 +580,23 @@ class InstallerConda(InstallerVenv):
     @classmethod
     def from_yaml(
         cls,
-        *paths: PathLike,
         session: Session,
+        paths: PathLike | Iterable[PathLike] | None,
         conda_deps: str | Iterable[str] | None = None,
         pip_deps: str | Iterable[str] | None = None,
         channels: str | Iterable[str] | None = None,
         remove_python: bool = True,
         **kwargs: Any,
     ) -> Self:
-        assert isinstance(session.python, str)
-        channels, conda_deps, pip_deps, _ = parse_envs(
-            *_verify_paths(
-                paths, lock=False, ext=".yaml", python_version=session.python
-            ),
-            remove_python=remove_python,
-            deps=conda_deps,
-            reqs=pip_deps,
-            channels=channels,
-        )
+        if paths:
+            assert isinstance(session.python, str)
+            channels, conda_deps, pip_deps, _ = parse_envs(
+                *_verify_paths(paths or [], ext=".yaml", python_version=session.python),
+                remove_python=remove_python,
+                deps=conda_deps,
+                reqs=pip_deps,
+                channels=channels,
+            )
 
         return cls(
             session=session,
@@ -602,12 +607,11 @@ class InstallerConda(InstallerVenv):
         )
 
     @classmethod
-    def from_params(  # pyright: ignore
+    def from_params(
         cls,
         session: Session,
-        base_name: str | None,
+        base_name: PathLike | Iterable[PathLike] | None = None,
         lock: bool = False,
-        filename: PathLike | None = None,
         **kwargs: Any,
     ) -> Self:
         """
@@ -619,23 +623,23 @@ class InstallerConda(InstallerVenv):
             `requirements/py{py}-dev.yaml` for `filename`
         """
 
-        if base_name is None and filename is None:
-            raise ValueError("must supply base_name or filename")
-
-        assert isinstance(session.python, str)
-        if filename is None:
-            filename = session_environment_filename(
-                name=base_name, ext=".yaml", python_version=session.python, lock=lock
-            )
-        else:
-            filename = _verify_path(filename, lock=lock)
-
         if lock:
-            kwargs["conda_lock_path"] = filename
+            # get files from base_name
+            assert isinstance(session.python, str)
+            paths = _verify_paths(
+                base_name or [], lock=lock, ext=".yaml", python_version=session.python
+            )
+
+            if not paths or len(paths) != 1:
+                raise ValueError(
+                    "Must supply single lock file.  basename: {base_name}, filename: {filename}"
+                )
+
+            kwargs["conda_lock_path"] = paths[0]
             return cls(session=session, lock=lock, **kwargs)
 
         else:
-            return cls.from_yaml(filename, session=session, lock=lock, **kwargs)
+            return cls.from_yaml(session=session, paths=base_name, lock=lock, **kwargs)
 
 
 # * Utilities --------------------------------------------------------------------------
