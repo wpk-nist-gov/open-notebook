@@ -290,3 +290,9 @@ pytest-nbval:  ## run pytest --nbval
 cog-readme: ## apply cog to README.md
 	COLUMNS=90 cog -rP README.md
 	pre-commit run markdownlint --files README.md
+
+
+.PHONY: typing-tools
+typing-tools:
+	mypy noxfile.py tools
+	pyright noxfile.py tools

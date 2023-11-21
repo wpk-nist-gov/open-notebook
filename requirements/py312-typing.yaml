@@ -12,9 +12,5 @@ channels:
 dependencies:
   - python=3.12
   - mypy >= 1.4.1
-  - pytest
-  - pytest-cov
-  - pytest-sugar
-  - pytest-xdist
   - tomli
   - typing-extensions

@@ -66,8 +66,10 @@ def session_environment_filename(
     return filename
 
 
-# * Main class-------------------------------------------------------------------------
-class SessionWrapper:
+# * Main class ----------------------------------------------------------------
+
+
+class InstallerVenv:
     """
     Class to handle installing package/dependecies
 
@@ -79,8 +81,6 @@ class SessionWrapper:
     package: str, optional
     pip_deps : str or list of str, optional
         pip dependencies
-    conda_deps : str or list of str, optional
-        conda dependencies
     requirements : str or list of str
         pip requirement file(s) (pip install -r requirements[0] ...)
     constraints : str or list of str
@@ -89,6 +89,10 @@ class SessionWrapper:
         Where to save env config for furture comparison.  Defaults to
         `session.create_tmp() / "env.json"`.
     """
+
+    # keys to sae to config
+    _CONFIG_LIST_KEYS = ["package", "package_extras", "pip_deps"]
+    _CONFIG_PATH_KEYS = ["requirements", "constraints"]
 
     def __init__(
         self,
@@ -99,9 +103,6 @@ class SessionWrapper:
         package: str | bool | None = None,
         package_extras: str | Iterable[str] | None = None,
         pip_deps: str | Iterable[str] | None = None,
-        conda_deps: str | Iterable[str] | None = None,
-        conda_lock_path: PathLike | None = None,
-        channels: str | Iterable[str] | None = None,
         requirements: PathLike | Iterable[PathLike] | None = None,
         constraints: PathLike | Iterable[PathLike] | None = None,
         config_path: PathLike | None = None,
@@ -126,27 +127,18 @@ class SessionWrapper:
         self.requirements = sorted(_verify_paths(requirements))
         self.constraints = sorted(_verify_paths(constraints))
 
-        self.conda_deps: list[str] = sorted(_remove_whitespace_list(conda_deps or []))
-        self.channels: list[str] = sorted(_remove_whitespace_list(channels or []))
-        self.conda_lock_path = conda_lock_path
-
     @cached_property
     def config(self) -> dict[str, Any]:
         """Dictionary of relavent info for this session"""
         out: dict[str, Any] = {}
         out["lock"] = self.lock
 
-        for k in [
-            "package",
-            "package_extras",
-            "pip_deps",
-            "conda_deps",
-        ]:
+        for k in self._CONFIG_LIST_KEYS:
             if v := getattr(self, k):
                 out[k] = v
 
         # file hashses
-        for k in ["conda_lock_path", "requirements", "constraints"]:
+        for k in self._CONFIG_PATH_KEYS:
             if v := getattr(self, k):
                 if isinstance(v, str):
                     v = [v]
@@ -176,7 +168,10 @@ class SessionWrapper:
 
     @cached_property
     def skip_install(self) -> bool:
-        return self.session._runner.global_config.no_install and self.session._runner.venv._reused  # type: ignore
+        try:
+            return self.session._runner.global_config.no_install and self.session._runner.venv._reused  # type: ignore
+        except Exception:
+            return False
 
     @cached_property
     def changed(self) -> bool:
@@ -223,34 +218,16 @@ class SessionWrapper:
                 self.session.run(*opt, **kwargs)
         return self
 
-    def set_ipykernel_display_name(
-        self,
-        display_name: str | None = None,
-        update: bool = False,
-        check_skip_install: bool = True,
-    ) -> Self:
-        if not display_name or (check_skip_install and self.skip_install):
-            pass
-        elif self.changed or update or self.update:
-            command = f"python -m ipykernel install --sys-prefix --display-name {display_name}".split()
-            # continue if fails
-            self.session.run(*command, success_codes=[0, 1])
+    def _log_session(self, stdout: TextIO) -> None:
+        self.session.run("pip", "list", stdout=stdout)
 
-        return self
-
-    def log_session(self, conda: bool | None = None) -> Self:
+    def log_session(self) -> Self:
         logfile = Path(self.session.create_tmp()) / "env_info.txt"
         self.session.log(f"writing environment log to {logfile}")
 
-        if conda is None:
-            conda = bool(self.conda_deps or self.conda_lock_path)
-
         with logfile.open("w") as f:
             self.session.run("python", "--version", stdout=f)
-            if conda:
-                self.session.run("conda", "list", stdout=f)
-            else:
-                self.session.run("pip", "list", stdout=f)
+            self._log_session(f)
 
         return self
 
@@ -271,11 +248,7 @@ class SessionWrapper:
         log_session: bool = False,
         save_config: bool = True,
     ) -> Self:
-        out = (
-            self.conda_install_deps()
-            .pip_install_deps()
-            .pip_install_package(update=update_package)
-        )
+        out = self.pip_install_deps().pip_install_package(update=update_package)
 
         if log_session:
             out = out.log_session()
@@ -345,6 +318,113 @@ class SessionWrapper:
             self.session.install(*install_args, *args, **kwargs)
 
         return self
+
+    @classmethod
+    def from_params(
+        cls,
+        session: Session,
+        lock: bool = False,
+        pip_deps: str | Iterable[str] | None = None,
+        requirements: PathLike | Iterable[PathLike] | None = None,
+        constraints: PathLike | Iterable[PathLike] | None = None,
+        **kwargs: Any,
+    ) -> Self:
+        if lock:
+            raise ValueError("lock not yet supported?")
+
+        return cls(
+            session=session,
+            lock=lock,
+            pip_deps=pip_deps,
+            requirements=_verify_paths(requirements),
+            constraints=_verify_paths(constraints),
+            **kwargs,
+        )
+
+
+class InstallerConda(InstallerVenv):
+    """
+    Class to handle installing dependencies in a conda environment.
+
+    Parameters
+    ----------
+    conda_deps :
+        conda dependencies
+    conda_lock_path :
+        Path of lock file
+    channels :
+        Conda channels.
+    """
+
+    _CONFIG_LIST_KEYS = InstallerVenv._CONFIG_LIST_KEYS + ["conda_deps", "channels"]
+    _CONFIG_PATH_KEYS = InstallerVenv._CONFIG_PATH_KEYS + ["conda_lock_path"]
+
+    def __init__(
+        self,
+        session: Session,
+        *,
+        update: bool = False,
+        lock: bool = False,
+        package: str | bool | None = None,
+        package_extras: str | Iterable[str] | None = None,
+        pip_deps: str | Iterable[str] | None = None,
+        requirements: PathLike | Iterable[PathLike] | None = None,
+        constraints: PathLike | Iterable[PathLike] | None = None,
+        config_path: PathLike | None = None,
+        # conda specific stuff:
+        conda_deps: str | Iterable[str] | None = None,
+        conda_lock_path: PathLike | None = None,
+        channels: str | Iterable[str] | None = None,
+    ):
+        super().__init__(
+            session=session,
+            update=update,
+            lock=lock,
+            package=package,
+            package_extras=package_extras,
+            pip_deps=pip_deps,
+            requirements=requirements,
+            constraints=constraints,
+            config_path=config_path,
+        )
+
+        self.conda_deps: list[str] = sorted(_remove_whitespace_list(conda_deps or []))
+        self.channels: list[str] = sorted(_remove_whitespace_list(channels or []))
+
+        if self.lock:
+            assert conda_lock_path is not None
+        self.conda_lock_path = conda_lock_path
+
+    def set_ipykernel_display_name(
+        self,
+        display_name: str | None = None,
+        update: bool = False,
+        check_skip_install: bool = True,
+    ) -> Self:
+        if not display_name or (check_skip_install and self.skip_install):
+            pass
+        elif self.changed or update or self.update:
+            command = f"python -m ipykernel install --sys-prefix --display-name {display_name}".split()
+            # continue if fails
+            self.session.run(*command, success_codes=[0, 1])
+
+        return self
+
+    def _log_session(self, stdout: TextIO) -> None:
+        self.session.run("conda", "list", stdout=stdout, external=True)
+
+    def install_all(
+        self,
+        update_package: bool = False,
+        log_session: bool = False,
+        save_config: bool = True,
+    ) -> Self:
+        self.conda_install_deps()
+        return super().install_all(
+            update_package=update_package,
+            log_session=log_session,
+            save_config=save_config,
+        )
 
     def conda_install_deps(
         self,
@@ -440,7 +520,7 @@ class SessionWrapper:
 
     # Super convenience methods
     @classmethod
-    def from_conda_yaml(
+    def from_yaml(
         cls,
         *paths: PathLike,
         session: Session,
@@ -470,10 +550,10 @@ class SessionWrapper:
         )
 
     @classmethod
-    def from_conda_params(
+    def from_params(  # pyright: ignore
         cls,
-        base_name: str,
         session: Session,
+        base_name: str | None,
         lock: bool = False,
         filename: PathLike | None = None,
         **kwargs: Any,
@@ -486,6 +566,9 @@ class SessionWrapper:
             base_name = "dev" will convert to
             `requirements/py{py}-dev.yaml` for `filename`
         """
+
+        if base_name is None and filename is None:
+            raise ValueError("must supply base_name or filename")
 
         assert isinstance(session.python, str)
         if filename is None:
@@ -500,29 +583,7 @@ class SessionWrapper:
             return cls(session=session, lock=lock, **kwargs)
 
         else:
-            return cls.from_conda_yaml(filename, session=session, lock=lock, **kwargs)
-
-    @classmethod
-    def from_pip_params(
-        cls,
-        session: Session,
-        lock: bool = False,
-        pip_deps: str | Iterable[str] | None = None,
-        requirements: PathLike | Iterable[PathLike] | None = None,
-        constraints: PathLike | Iterable[PathLike] | None = None,
-        **kwargs: Any,
-    ) -> Self:
-        if lock:
-            raise ValueError("lock not yet supported?")
-
-        return cls(
-            session=session,
-            lock=lock,
-            pip_deps=pip_deps,
-            requirements=_verify_paths(requirements),
-            constraints=_verify_paths(constraints),
-            **kwargs,
-        )
+            return cls.from_yaml(filename, session=session, lock=lock, **kwargs)
 
 
 # * Utilities --------------------------------------------------------------------------
@@ -678,7 +739,10 @@ def open_webpage(path: str | Path | None = None, url: str | None = None) -> None
 
 
 def session_run_commands(
-    session: Session, commands: list[list[str]], external: bool = True, **kws: Any
+    session: Session,
+    commands: list[list[str]] | None,
+    external: bool = True,
+    **kws: Any,
 ) -> None:
     """Run commands command."""
 

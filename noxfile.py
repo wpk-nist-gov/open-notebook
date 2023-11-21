@@ -37,7 +37,8 @@ from noxopt import NoxOpt, Option, Session  # type: ignore[unused-ignore,import]
 sys.path.insert(0, ".")
 
 from tools.noxtools import (
-    SessionWrapper,
+    InstallerConda,
+    InstallerVenv,
     combine_list_str,
     load_nox_config,
     open_webpage,
@@ -105,7 +106,6 @@ NOPYTHON_SESSION = cast(C[F], group.session(python=False))  # type: ignore
 INHERITED_SESSION_VENV = cast(C[F], group.session)  # type: ignore
 
 OPTS_OPT = Option(nargs="*", type=str)
-# SET_KERNEL_OPT = Option(type=bool, help="If True, try to set the kernel name")
 RUN_OPT = Option(
     nargs="*",
     type=str,
@@ -117,20 +117,24 @@ CMD_OPT = Option(nargs="*", type=str, help="cmd to be run")
 LOCK_OPT = Option(type=bool, help="If True, use conda-lock")
 
 
+ListStr = "list[str] | None"
+ListListStr = "list[list[str]] | None"
+
+
 def opts_annotated(**kwargs: Any):  # type: ignore[unused-ignore,no-untyped-def]
-    return Annotated["list[str]", replace(OPTS_OPT, **kwargs)]
+    return Annotated["list[str] | None", replace(OPTS_OPT, **kwargs)]
 
 
 def cmd_annotated(**kwargs: Any):  # type: ignore[unused-ignore,no-untyped-def]
-    return Annotated["list[str]", replace(CMD_OPT, **kwargs)]
+    return Annotated["list[str] | None", replace(CMD_OPT, **kwargs)]
 
 
 def run_annotated(**kwargs: Any):  # type: ignore[unused-ignore,no-untyped-def]
-    return Annotated["list[list[str]]", replace(RUN_OPT, **kwargs)]
+    return Annotated["list[list[str]] | None", replace(RUN_OPT, **kwargs)]
 
 
 LOCK_CLI = Annotated[bool, LOCK_OPT]
-RUN_CLI = Annotated["list[list[str]]", RUN_OPT]
+RUN_CLI = Annotated["list[list[str]] | None", RUN_OPT]
 TEST_OPTS_CLI = opts_annotated(help="extra arguments/flags to pytest")
 DEV_EXTRAS_CLI = cmd_annotated(help="extras included in user dev environment")
 PYTHON_PATHS_CLI = cmd_annotated(help="python paths to append to PATHS")
@@ -169,6 +173,17 @@ LOG_SESSION_CLI = Annotated[
 
 # * Environments------------------------------------------------------------------------
 # ** Dev (conda)
+
+
+@NOPYTHON_SESSION
+def example(
+    session: Session,
+    example_run: RUN_CLI = [],
+) -> None:
+    print(type(example_run))
+    print(example_run)
+
+
 @DEFAULT_SESSION
 def dev(
     session: Session,
@@ -182,7 +197,7 @@ def dev(
     # using conda
 
     (
-        SessionWrapper.from_conda_params(
+        InstallerConda.from_params(
             session=session, base_name="dev", lock=lock, update=update, package="."
         )
         .install_all(update_package=update_package, log_session=log_session)
@@ -205,7 +220,7 @@ def dev_venv(
     # using conda
 
     (
-        SessionWrapper.from_pip_params(
+        InstallerVenv.from_params(
             session=session,
             requirements="dev.txt",
             lock=lock,
@@ -269,7 +284,7 @@ def requirements(
     """
 
     (
-        SessionWrapper.from_pip_params(
+        InstallerVenv.from_params(
             session=session,
             pip_deps="pyproject2conda>=0.8.0",
             update=update,
@@ -282,31 +297,6 @@ def requirements(
         "--verbose",
         *(["--overwrite", "force"] if requirements_force else []),
     )
-
-
-# @DEFAULT_SESSION_VENV
-# def conda_lock_create(
-#         session: Session,
-#         conda_lock_create_path: Annotated[str, Option(type=str, help="path to create")],
-#         conda_lock_create_lock_file: Annotated[str, Option(type=str, help="lock file")],
-#         conda_lock_create_extras: Annotated["list[str]", Option(nargs="*", help="extras")]
-#         update: UPDATE_CLI: bool = False,
-#         log_session: bool = False,
-# ) -> None:
-
-
-#     (
-#         SessionWrapper.from_pip_params(
-#             session=session,
-#             pip_deps="conda-lock>2.2.0",
-#             name="conda-lock-create",
-#             update=update,
-#         )
-#         .install_all(log_session=log_session)
-#     )
-
-#     session.log(f"conda_lock_create_path: {conda_lock_create_path}")
-#     session.log(f"conda_lock_create_")
 
 
 # ** conda-lock
@@ -329,7 +319,7 @@ def conda_lock(
     """Create lock files using conda-lock."""
 
     (
-        SessionWrapper.from_pip_params(
+        InstallerVenv.from_params(
             session=session,
             pip_deps="conda-lock>=2.2.0",
             update=update,
@@ -432,7 +422,7 @@ def test(
     """Test environments with conda installs."""
 
     (
-        SessionWrapper.from_conda_params(
+        InstallerConda.from_params(
             session=session,
             base_name="test",
             lock=lock,
@@ -465,7 +455,7 @@ def test_venv(
     """Test environments virtualenv and pip installs."""
 
     (
-        SessionWrapper.from_pip_params(
+        InstallerVenv.from_params(
             session=session,
             lock=lock,
             package=".",
@@ -535,7 +525,7 @@ def coverage(
     update: UPDATE_CLI = False,
 ) -> None:
     (
-        SessionWrapper.from_pip_params(
+        InstallerVenv.from_params(
             session=session, pip_deps="coverage[toml]", update=update
         ).install_all()
     )
@@ -627,7 +617,7 @@ def docs(
     """Runs make in docs directory. For example, 'nox -s docs -- --docs-cmd html' -> 'make -C docs html'. With 'release' option, you can set the message with 'message=...' in posargs."""
 
     (
-        SessionWrapper.from_conda_params(
+        InstallerConda.from_params(
             session=session, base_name="docs", lock=lock, package=".", update=update
         )
         .install_all(update_package=update_package, log_session=log_session)
@@ -679,7 +669,7 @@ def docs_venv(
     """Runs make in docs directory. For example, 'nox -s docs -- --docs-cmd html' -> 'make -C docs html'. With 'release' option, you can set the message with 'message=...' in posargs."""
 
     (
-        SessionWrapper.from_pip_params(
+        InstallerVenv.from_params(
             session=session,
             lock=lock,
             package=".",
@@ -751,7 +741,7 @@ def dist_pypi(
     """Run 'nox -s dist-pypi -- {clean, build, testrelease, release}'."""
 
     (
-        SessionWrapper.from_pip_params(
+        InstallerVenv.from_params(
             session=session,
             requirements="dist-pypi.txt",
             update=update,
@@ -792,7 +782,7 @@ def dist_pypi_condaenv(
     # conda
 
     (
-        SessionWrapper.from_conda_params(
+        InstallerConda.from_params(
             session=session,
             base_name="dist-pypi",
             update=update,
@@ -839,7 +829,7 @@ def dist_conda(
 ) -> None:
     """Runs make -C dist-conda posargs."""
 
-    runner = SessionWrapper.from_conda_params(
+    runner = InstallerConda.from_params(
         session=session, base_name="dist-conda", update=update
     ).install_all(log_session=log_session)
 
@@ -946,7 +936,7 @@ def lint(
     `nox -s lint -- --lint-run "pre-commit run --hook-stage manual --all-files`
     """
 
-    runner = SessionWrapper.from_pip_params(
+    runner = InstallerVenv.from_params(
         session=session, pip_deps="pre-commit", update=update
     ).install_all(log_session=log_session)
 
@@ -1038,7 +1028,7 @@ def typing(
     """Run type checkers (mypy, pyright, pytype)."""
 
     (
-        SessionWrapper.from_conda_params(
+        InstallerConda.from_params(
             session=session,
             base_name="typing",
             lock=lock,
@@ -1090,23 +1080,13 @@ def typing_venv(
     """Run type checkers (mypy, pyright, pytype)."""
 
     (
-        SessionWrapper.from_pip_params(
+        InstallerVenv.from_params(
             session=session,
             lock=lock,
             update=update,
             requirements="typing.txt",
         ).install_all(log_session=log_session)
     )
-
-    # pkg_install_venv(
-    #     session=session,
-    #     name="typing",
-    #     lock=lock,
-    #     requirement_paths="typing.txt",
-    #     install_package=False,
-    #     update=update,
-    #     log_session=log_session,
-    # )
 
     _typing(
         session=session,
@@ -1134,7 +1114,7 @@ def testdist_conda(
         install_str = f"{install_str}=={version}"
 
     (
-        SessionWrapper.from_conda_params(
+        InstallerConda.from_params(
             session=session,
             base_name="test-extras",
             conda_deps=install_str,
@@ -1142,16 +1122,6 @@ def testdist_conda(
             channels="conda-forge",
         ).install_all(log_session=log_session)
     )
-
-    # pkg_install_condaenv(
-    #     session=session,
-    #     name="test-extras",
-    #     deps=[install_str],
-    #     channels=["conda-forge"],
-    #     update=update,
-    #     install_package=False,
-    #     log_session=log_session,
-    # )
 
     _test(
         session=session,
@@ -1185,23 +1155,13 @@ def testdist_pypi(
         install_str = f"{install_str}=={version}"
 
     (
-        SessionWrapper.from_pip_params(
+        InstallerVenv.from_params(
             session=session,
             requirements="test-extras.txt",
             pip_deps=install_str,
             update=update,
         ).install_all(log_session=log_session)
     )
-
-    # pkg_install_venv(
-    #     session=session,
-    #     name="testdist-pypi",
-    #     requirement_paths="test-extras.txt",
-    #     reqs=[install_str],
-    #     update=update,
-    #     install_package=False,
-    #     log_session=log_session,
-    # )
 
     _test(
         session=session,
@@ -1234,7 +1194,7 @@ def testdist_pypi_condaenv(
         install_str = f"{install_str}=={version}"
 
     (
-        SessionWrapper.from_conda_params(
+        InstallerConda.from_params(
             session=session,
             base_name="test-extras",
             pip_deps=install_str,
@@ -1242,16 +1202,6 @@ def testdist_pypi_condaenv(
             channels="conda-forge",
         ).install_all(log_session=log_session)
     )
-
-    # pkg_install_condaenv(
-    #     session=session,
-    #     name="test-extras",
-    #     reqs=[install_str],
-    #     channels=["conda-forge"],
-    #     update=update,
-    #     install_package=False,
-    #     log_session=log_session,
-    # )
 
     _test(
         session=session,
