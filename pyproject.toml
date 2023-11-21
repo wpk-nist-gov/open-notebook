@@ -350,7 +350,7 @@ ignore_errors = true
 module = []
 
 [tool.pyright]
-include = ["src", "tests"]
+include = ["src", "tests", "noxfile.py", "tools/noxtools2.py"]
 exclude = ["**/__pycache__", ".tox/**", ".nox/**", "**/.mypy_cache"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"

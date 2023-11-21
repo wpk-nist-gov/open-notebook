@@ -35,12 +35,12 @@ from noxopt import NoxOpt, Option, Session  # type: ignore[unused-ignore,import]
 
 # fmt: off
 sys.path.insert(0, ".")
+
 from tools.noxtools import (
+    SessionWrapper,
     combine_list_str,
     load_nox_config,
     open_webpage,
-    pkg_install_condaenv,
-    pkg_install_venv,
     prepend_flag,
     session_run_commands,
     sort_like,
@@ -181,17 +181,14 @@ def dev(
     """Create dev env using conda."""
     # using conda
 
-    pkg_install_condaenv(
-        session=session,
-        name="dev",
-        lock=lock,
-        display_name=f"{PACKAGE_NAME}-dev",
-        install_package=True,
-        update=update,
-        update_package=update_package,
-        log_session=log_session,
+    (
+        SessionWrapper.from_conda_params(
+            session=session, base_name="dev", lock=lock, update=update, package="."
+        )
+        .install_all(update_package=update_package, log_session=log_session)
+        .set_ipykernel_display_name(f"{PACKAGE_NAME}-dev")
+        .run_commands(dev_run)
     )
-    session_run_commands(session, dev_run)
 
 
 # ** Dev (virtualenv)
@@ -207,18 +204,17 @@ def dev_venv(
     """Create dev env using virtualenv."""
     # using conda
 
-    pkg_install_venv(
-        session=session,
-        name="dev-venv",
-        lock=lock,
-        requirement_paths="dev.txt",
-        display_name=f"{PACKAGE_NAME}-dev-venv",
-        install_package=True,
-        update=update,
-        update_package=update_package,
-        log_session=log_session,
+    (
+        SessionWrapper.from_pip_params(
+            session=session,
+            requirements="dev.txt",
+            lock=lock,
+            update=update,
+            package=".",
+        )
+        .install_all(update_package=update_package, log_session=log_session)
+        .run_commands(dev_run)
     )
-    session_run_commands(session, dev_run)
 
 
 # ** bootstrap
@@ -240,7 +236,7 @@ def config(
 ) -> None:
     """Create the file ./config/userconfig.toml"""
 
-    args = []
+    args: list[str] = []
     if dev_extras:
         args += ["--dev-extras"] + dev_extras
     if python_paths:
@@ -271,12 +267,13 @@ def requirements(
 
     These will be placed in the directory "./environments".
     """
-    pkg_install_venv(
-        session=session,
-        reqs=["pyproject2conda>=0.8.0"],
-        name="reqs",
-        update=update,
-        log_session=log_session,
+
+    (
+        SessionWrapper.from_pip_params(
+            session=session,
+            pip_deps="pyproject2conda>=0.8.0",
+            update=update,
+        ).install_all(log_session=log_session)
     )
 
     session.run(
@@ -285,6 +282,31 @@ def requirements(
         "--verbose",
         *(["--overwrite", "force"] if requirements_force else []),
     )
+
+
+# @DEFAULT_SESSION_VENV
+# def conda_lock_create(
+#         session: Session,
+#         conda_lock_create_path: Annotated[str, Option(type=str, help="path to create")],
+#         conda_lock_create_lock_file: Annotated[str, Option(type=str, help="lock file")],
+#         conda_lock_create_extras: Annotated["list[str]", Option(nargs="*", help="extras")]
+#         update: UPDATE_CLI: bool = False,
+#         log_session: bool = False,
+# ) -> None:
+
+
+#     (
+#         SessionWrapper.from_pip_params(
+#             session=session,
+#             pip_deps="conda-lock>2.2.0",
+#             name="conda-lock-create",
+#             update=update,
+#         )
+#         .install_all(log_session=log_session)
+#     )
+
+#     session.log(f"conda_lock_create_path: {conda_lock_create_path}")
+#     session.log(f"conda_lock_create_")
 
 
 # ** conda-lock
@@ -306,11 +328,12 @@ def conda_lock(
 ) -> None:
     """Create lock files using conda-lock."""
 
-    pkg_install_venv(
-        session,
-        name="conda-lock",
-        reqs=["conda-lock>=2.2.0"],
-        update=update,
+    (
+        SessionWrapper.from_pip_params(
+            session=session,
+            pip_deps="conda-lock>=2.2.0",
+            update=update,
+        ).install_all()
     )
 
     session.run("conda-lock", "--version")
@@ -333,12 +356,12 @@ def conda_lock(
         # check if skip
         env = "-".join(name.split("-")[1:])
         if conda_lock_include:
-            if not any(c == env for c in conda_lock_include):
+            if not any(c == env for c in conda_lock_include):  # pyright: ignore
                 session.log(f"Skipping {lockfile} (include)")
                 return
 
         if conda_lock_exclude:
-            if any(c == env for c in conda_lock_exclude):
+            if any(c == env for c in conda_lock_exclude):  # pyright: ignore
                 session.log(f"Skipping {lockfile} (exclude)")
                 return
 
@@ -408,14 +431,14 @@ def test(
 ) -> None:
     """Test environments with conda installs."""
 
-    pkg_install_condaenv(
-        session=session,
-        name="test",
-        lock=lock,
-        install_package=True,
-        update=update,
-        update_package=update_package,
-        log_session=log_session,
+    (
+        SessionWrapper.from_conda_params(
+            session=session,
+            base_name="test",
+            lock=lock,
+            package=".",
+            update=update,
+        ).install_all(log_session=log_session, update_package=update_package)
     )
 
     _test(
@@ -441,15 +464,25 @@ def test_venv(
 ) -> None:
     """Test environments virtualenv and pip installs."""
 
-    pkg_install_venv(
-        session=session,
-        name="test-venv",
-        install_package=True,
-        requirement_paths="test.txt",
-        update=update,
-        update_package=update_package,
-        log_session=log_session,
+    (
+        SessionWrapper.from_pip_params(
+            session=session,
+            lock=lock,
+            package=".",
+            requirements="test.txt",
+            update=update,
+        ).install_all(update_package=update_package, log_session=log_session)
     )
+
+    # pkg_install_venv(
+    #     session=session,
+    #     name="test-venv",
+    #     install_package=True,
+    #     requirement_paths="test.txt",
+    #     update=update,
+    #     update_package=update_package,
+    #     log_session=log_session,
+    # )
 
     _test(
         session=session,
@@ -501,12 +534,18 @@ def coverage(
     ) = [],  # noqa
     update: UPDATE_CLI = False,
 ) -> None:
-    pkg_install_venv(
-        session,
-        name="coverage",
-        reqs=["coverage[toml]"],
-        update=update,
+    (
+        SessionWrapper.from_pip_params(
+            session=session, pip_deps="coverage[toml]", update=update
+        ).install_all()
     )
+
+    # pkg_install_venv(
+    #     session,
+    #     name="coverage",
+    #     reqs=["coverage[toml]"],
+    #     update=update,
+    # )
 
     _coverage(
         session=session,
@@ -586,20 +625,29 @@ def docs(
     log_session: bool = False,
 ) -> None:
     """Runs make in docs directory. For example, 'nox -s docs -- --docs-cmd html' -> 'make -C docs html'. With 'release' option, you can set the message with 'message=...' in posargs."""
-    pkg_install_condaenv(
-        session=session,
-        name="docs",
-        lock=lock,
-        display_name=f"{PACKAGE_NAME}-docs",
-        install_package=True,
-        update=update,
-        update_package=update_package,
-        log_session=log_session,
+
+    (
+        SessionWrapper.from_conda_params(
+            session=session, base_name="docs", lock=lock, package=".", update=update
+        )
+        .install_all(update_package=update_package, log_session=log_session)
+        .set_ipykernel_display_name(f"{PACKAGE_NAME}-docs")
     )
 
+    # pkg_install_condaenv(
+    #     session=session,
+    #     name="docs",
+    #     lock=lock,
+    #     display_name=f"{PACKAGE_NAME}-docs",
+    #     install_package=True,
+    #     update=update,
+    #     update_package=update_package,
+    #     log_session=log_session,
+    # )
+
     _docs(
-        session=session, cmd=docs_cmd, run=docs_run, version=version
-    )  # pyright: ignore
+        session=session, cmd=docs_cmd, run=docs_run, version=version  # pyright: ignore
+    )
 
 
 @DEFAULT_SESSION_VENV
@@ -629,21 +677,33 @@ def docs_venv(
     log_session: bool = False,
 ) -> None:
     """Runs make in docs directory. For example, 'nox -s docs -- --docs-cmd html' -> 'make -C docs html'. With 'release' option, you can set the message with 'message=...' in posargs."""
-    pkg_install_venv(
-        session=session,
-        name="docs-venv",
-        lock=lock,
-        display_name=f"{PACKAGE_NAME}-docs-venv",
-        install_package=True,
-        update=update,
-        update_package=update_package,
-        log_session=log_session,
-        requirement_paths="docs.txt",
+
+    (
+        SessionWrapper.from_pip_params(
+            session=session,
+            lock=lock,
+            package=".",
+            update=update,
+            requirements="docs.txt",
+        ).install_all(update_package=update_package, log_session=log_session)
+        # .set_ipykernel_display_name(f"{PACKAGE_NAME}-docs")
     )
 
+    # pkg_install_venv(
+    #     session=session,
+    #     name="docs-venv",
+    #     lock=lock,
+    #     display_name=f"{PACKAGE_NAME}-docs-venv",
+    #     install_package=True,
+    #     update=update,
+    #     update_package=update_package,
+    #     log_session=log_session,
+    #     requirement_paths="docs.txt",
+    # )
+
     _docs(
-        session=session, cmd=docs_cmd, run=docs_run, version=version
-    )  # pyright: ignore
+        session=session, cmd=docs_cmd, run=docs_run, version=version  # pyright: ignore
+    )
 
 
 # ** Dist pypi
@@ -690,14 +750,22 @@ def dist_pypi(
 ) -> None:
     """Run 'nox -s dist-pypi -- {clean, build, testrelease, release}'."""
 
-    pkg_install_venv(
-        session=session,
-        name="dist-pypi",
-        requirement_paths="dist-pypi.txt",
-        update=update,
-        install_package=False,
-        log_session=log_session,
+    (
+        SessionWrapper.from_pip_params(
+            session=session,
+            requirements="dist-pypi.txt",
+            update=update,
+        ).install_all(log_session=log_session)
     )
+
+    # pkg_install_venv(
+    #     session=session,
+    #     name="dist-pypi",
+    #     requirement_paths="dist-pypi.txt",
+    #     update=update,
+    #     install_package=False,
+    #     log_session=log_session,
+    # )
 
     _dist_pypi(
         session=session,
@@ -723,13 +791,21 @@ def dist_pypi_condaenv(
     """Run 'nox -s dist_pypi -- {clean, build, testrelease, release}'."""
     # conda
 
-    pkg_install_condaenv(
-        session=session,
-        name="dist-pypi",
-        install_package=False,
-        update=update,
-        log_session=log_session,
+    (
+        SessionWrapper.from_conda_params(
+            session=session,
+            base_name="dist-pypi",
+            update=update,
+        ).install_all(log_session=log_session)
     )
+
+    # pkg_install_condaenv(
+    #     session=session,
+    #     name="dist-pypi",
+    #     install_package=False,
+    #     update=update,
+    #     log_session=log_session,
+    # )
 
     _dist_pypi(
         session=session,
@@ -762,16 +838,24 @@ def dist_conda(
     version: VERSION_CLI = "",
 ) -> None:
     """Runs make -C dist-conda posargs."""
-    pkg_install_condaenv(
-        session=session,
-        name="dist-conda",
-        install_package=False,
-        update=update,
-        log_session=log_session,
-    )
 
-    run, cmd = dist_conda_run, dist_conda_cmd
-    session_run_commands(session, run)
+    runner = SessionWrapper.from_conda_params(
+        session=session, base_name="dist-conda", update=update
+    ).install_all(log_session=log_session)
+
+    # pkg_install_condaenv(
+    #     session=session,
+    #     name="dist-conda",
+    #     install_package=False,
+    #     update=update,
+    #     log_session=log_session,
+    # )
+
+    run = dist_conda_run
+    cmd = cast("list[str]", dist_conda_cmd)
+
+    runner.run_commands(run)
+
     if not run and not cmd:
         cmd = ["recipe"]
 
@@ -861,17 +945,22 @@ def lint(
     To run something else pass, e.g.,
     `nox -s lint -- --lint-run "pre-commit run --hook-stage manual --all-files`
     """
-    pkg_install_venv(
-        session=session,
-        name="lint",
-        reqs=["pre-commit"],
-        install_package=False,
-        update=update,
-        log_session=log_session,
-    )
+
+    runner = SessionWrapper.from_pip_params(
+        session=session, pip_deps="pre-commit", update=update
+    ).install_all(log_session=log_session)
+
+    # pkg_install_venv(
+    #     session=session,
+    #     name="lint",
+    #     reqs=["pre-commit"],
+    #     install_package=False,
+    #     update=update,
+    #     log_session=log_session,
+    # )
 
     if lint_run:
-        session_run_commands(session, lint_run, external=False)
+        runner.run_commands(lint_run, external=True)
     else:
         session.run("pre-commit", "run", "--all-files")
 
@@ -948,20 +1037,29 @@ def typing(
 ) -> None:
     """Run type checkers (mypy, pyright, pytype)."""
 
-    pkg_install_condaenv(
-        session=session,
-        name="typing",
-        lock=lock,
-        install_package=False,
-        update=update,
-        log_session=log_session,
+    (
+        SessionWrapper.from_conda_params(
+            session=session,
+            base_name="typing",
+            lock=lock,
+            update=update,
+        ).install_all(log_session=log_session)
     )
+
+    # pkg_install_condaenv(
+    #     session=session,
+    #     name="typing",
+    #     lock=lock,
+    #     install_package=False,
+    #     update=update,
+    #     log_session=log_session,
+    # )
 
     _typing(
         session=session,
         run=typing_run,
-        cmd=typing_cmd,
-        run_internal=typing_run_internal,
+        cmd=typing_cmd,  # pyright: ignore
+        run_internal=typing_run_internal,  # pyright: ignore
     )
 
 
@@ -991,21 +1089,30 @@ def typing_venv(
 ) -> None:
     """Run type checkers (mypy, pyright, pytype)."""
 
-    pkg_install_venv(
-        session=session,
-        name="typing",
-        lock=lock,
-        requirement_paths="typing.txt",
-        install_package=False,
-        update=update,
-        log_session=log_session,
+    (
+        SessionWrapper.from_pip_params(
+            session=session,
+            lock=lock,
+            update=update,
+            requirements="typing.txt",
+        ).install_all(log_session=log_session)
     )
+
+    # pkg_install_venv(
+    #     session=session,
+    #     name="typing",
+    #     lock=lock,
+    #     requirement_paths="typing.txt",
+    #     install_package=False,
+    #     update=update,
+    #     log_session=log_session,
+    # )
 
     _typing(
         session=session,
         run=typing_run,
-        cmd=typing_cmd,
-        run_internal=typing_run_internal,
+        cmd=typing_cmd,  # pyright: ignore
+        run_internal=typing_run_internal,  # pyright: ignore
     )
 
 
@@ -1026,15 +1133,25 @@ def testdist_conda(
     if version:
         install_str = f"{install_str}=={version}"
 
-    pkg_install_condaenv(
-        session=session,
-        name="test-extras",
-        deps=[install_str],
-        channels=["conda-forge"],
-        update=update,
-        install_package=False,
-        log_session=log_session,
+    (
+        SessionWrapper.from_conda_params(
+            session=session,
+            base_name="test-extras",
+            conda_deps=install_str,
+            update=update,
+            channels="conda-forge",
+        ).install_all(log_session=log_session)
     )
+
+    # pkg_install_condaenv(
+    #     session=session,
+    #     name="test-extras",
+    #     deps=[install_str],
+    #     channels=["conda-forge"],
+    #     update=update,
+    #     install_package=False,
+    #     log_session=log_session,
+    # )
 
     _test(
         session=session,
@@ -1058,7 +1175,7 @@ def testdist_pypi(
     log_session: bool = False,
 ) -> None:
     """Test pypi distribution."""
-    extras = testdist_pypi_extras
+    extras = cast("list[str]", testdist_pypi_extras)
     install_str = PACKAGE_NAME
 
     if extras:
@@ -1067,15 +1184,24 @@ def testdist_pypi(
     if version:
         install_str = f"{install_str}=={version}"
 
-    pkg_install_venv(
-        session=session,
-        name="testdist-pypi",
-        requirement_paths="test-extras.txt",
-        reqs=[install_str],
-        update=update,
-        install_package=False,
-        log_session=log_session,
+    (
+        SessionWrapper.from_pip_params(
+            session=session,
+            requirements="test-extras.txt",
+            pip_deps=install_str,
+            update=update,
+        ).install_all(log_session=log_session)
     )
+
+    # pkg_install_venv(
+    #     session=session,
+    #     name="testdist-pypi",
+    #     requirement_paths="test-extras.txt",
+    #     reqs=[install_str],
+    #     update=update,
+    #     install_package=False,
+    #     log_session=log_session,
+    # )
 
     _test(
         session=session,
@@ -1098,7 +1224,7 @@ def testdist_pypi_condaenv(
     log_session: bool = False,
 ) -> None:
     """Test pypi distribution."""
-    extras = testdist_pypi_extras
+    extras = cast("list[str]", testdist_pypi_extras)
     install_str = PACKAGE_NAME
 
     if extras:
@@ -1107,15 +1233,25 @@ def testdist_pypi_condaenv(
     if version:
         install_str = f"{install_str}=={version}"
 
-    pkg_install_condaenv(
-        session=session,
-        name="test-extras",
-        reqs=[install_str],
-        channels=["conda-forge"],
-        update=update,
-        install_package=False,
-        log_session=log_session,
+    (
+        SessionWrapper.from_conda_params(
+            session=session,
+            base_name="test-extras",
+            pip_deps=install_str,
+            update=update,
+            channels="conda-forge",
+        ).install_all(log_session=log_session)
     )
+
+    # pkg_install_condaenv(
+    #     session=session,
+    #     name="test-extras",
+    #     reqs=[install_str],
+    #     channels=["conda-forge"],
+    #     update=update,
+    #     install_package=False,
+    #     log_session=log_session,
+    # )
 
     _test(
         session=session,
