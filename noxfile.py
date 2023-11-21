@@ -261,7 +261,7 @@ def dev_venv(
     (
         InstallerVenv.from_params(
             session=session,
-            requirements="dev.txt",
+            base_name="dev",
             lock=lock,
             update=update,
             package=".",
@@ -323,7 +323,7 @@ def requirements(
     """
 
     (
-        InstallerVenv.from_params(
+        InstallerVenv(
             session=session,
             pip_deps="pyproject2conda>=0.8.0",
             update=update,
@@ -503,9 +503,9 @@ def test_venv(
     (
         InstallerVenv.from_params(
             session=session,
+            base_name="test",
             lock=lock,
             package=".",
-            requirements="test.txt",
             update=update,
         ).install_all(update_package=update_package, log_session=log_session)
     )
@@ -563,7 +563,7 @@ def coverage(
     update: UPDATE_CLI = False,
 ) -> None:
     (
-        InstallerVenv.from_params(
+        InstallerVenv(
             session=session, pip_deps="coverage[toml]", update=update
         ).install_all()
     )
@@ -658,10 +658,10 @@ def docs_venv(
     (
         InstallerVenv.from_params(
             session=session,
+            base_name="docs",
             lock=lock,
             package=".",
             update=update,
-            requirements="docs.txt",
         ).install_all(update_package=update_package, log_session=log_session)
         # .set_ipykernel_display_name(f"{PACKAGE_NAME}-docs")
     )
@@ -712,7 +712,7 @@ def dist_pypi(
     (
         InstallerVenv.from_params(
             session=session,
-            requirements="dist-pypi.txt",
+            base_name="dist-pypi",
             update=update,
         ).install_all(log_session=log_session)
     )
@@ -876,7 +876,7 @@ def lint(
     `nox -s lint -- --lint-run "pre-commit run --hook-stage manual --all-files`
     """
 
-    runner = InstallerVenv.from_params(
+    runner = InstallerVenv(
         session=session, pip_deps="pre-commit", update=update
     ).install_all(log_session=log_session)
 
@@ -996,9 +996,9 @@ def typing_venv(
     (
         InstallerVenv.from_params(
             session=session,
+            base_name="typing",
             lock=lock,
             update=update,
-            requirements="typing.txt",
         ).install_all(log_session=log_session)
     )
 
@@ -1070,7 +1070,7 @@ def testdist_pypi(
     (
         InstallerVenv.from_params(
             session=session,
-            requirements="test-extras.txt",
+            base_name="test-extras",
             pip_deps=install_str,
             update=update,
         ).install_all(log_session=log_session)

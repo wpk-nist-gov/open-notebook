@@ -41,11 +41,14 @@ def session_environment_filename(
     if name is None:
         raise ValueError("must supply name")
 
+    # adjust filename
     filename = name
-    if ext is not None:
+    if ext is not None and not filename.endswith(ext):
         filename = filename + ext
     if python_version is not None:
-        filename = f"{py_prefix(python_version)}-{filename}"
+        prefix = py_prefix(python_version)
+        if not filename.startswith(prefix):
+            filename = f"{prefix}-{filename}"
 
     if lock:
         if filename.endswith(".yaml"):
@@ -66,6 +69,47 @@ def session_environment_filename(
     return filename
 
 
+def _verify_path(
+    path: PathLike,
+    lock: bool = False,
+    ext: str | None = None,
+    python_version: str | None = None,
+) -> str:
+    if isinstance(path, Path):
+        if not path.exists():
+            raise ValueError(f"Passed path {path} that does not exist")
+        else:
+            path = str(path)
+    else:
+        if not Path(path).exists():
+            inferred = session_environment_filename(
+                name=path, ext=ext, python_version=python_version, lock=lock
+            )
+            if Path(inferred).exists():
+                path = inferred
+            else:
+                raise ValueError(f"no file {path} found/inferred")
+
+    return path
+
+
+def _verify_paths(
+    paths: PathLike | Iterable[PathLike] | None,
+    lock: bool = False,
+    ext: str | None = None,
+    python_version: str | None = None,
+) -> list[str]:
+    if paths is None:
+        return []
+    elif isinstance(paths, (str, Path)):
+        paths = [paths]
+
+    return [
+        _verify_path(p, lock=lock, ext=ext, python_version=python_version)
+        for p in paths
+    ]
+
+
 # * Main class ----------------------------------------------------------------
 
 
@@ -83,6 +127,8 @@ class InstallerVenv:
         pip dependencies
     requirements : str or list of str
         pip requirement file(s) (pip install -r requirements[0] ...)
+        Can either be a full path or a basename (for example,
+        "test" will get resolved to ./requirements/test.txt)
     constraints : str or list of str
         pip constraint file(s) (pip install -c ...)
     config_path :
@@ -124,8 +170,9 @@ class InstallerVenv:
         self.package_extras = _to_list_of_str(package_extras)
 
         self.pip_deps: list[str] = sorted(_remove_whitespace_list(pip_deps or []))
-        self.requirements = sorted(_verify_paths(requirements))
-        self.constraints = sorted(_verify_paths(constraints))
+
+        self.requirements = sorted(_verify_paths(requirements, ext=".txt"))
+        self.constraints = sorted(_verify_paths(constraints, ext=".txt"))
 
     @cached_property
     def config(self) -> dict[str, Any]:
@@ -323,21 +370,26 @@ class InstallerVenv:
     def from_params(
         cls,
         session: Session,
+        base_name: str | None,
         lock: bool = False,
-        pip_deps: str | Iterable[str] | None = None,
-        requirements: PathLike | Iterable[PathLike] | None = None,
-        constraints: PathLike | Iterable[PathLike] | None = None,
         **kwargs: Any,
     ) -> Self:
         if lock:
             raise ValueError("lock not yet supported?")
 
+        if base_name is not None:
+            requirements = kwargs.get("requirements", [])
+            if isinstance(requirements, str):
+                requirements = [requirements]
+
+            new_requirement = session_environment_filename(name=base_name, ext=".txt")
+
+            if new_requirement not in requirements:
+                kwargs["requirements"] = list(requirements) + [new_requirement]
+
         return cls(
             session=session,
             lock=lock,
-            pip_deps=pip_deps,
-            requirements=_verify_paths(requirements),
-            constraints=_verify_paths(constraints),
             **kwargs,
         )
 
@@ -596,44 +648,6 @@ def _to_list_of_str(x: str | Iterable[str] | None) -> list[str]:
         return x
     else:
         return list(x)
-
-
-def _verify_path(
-    path: PathLike,
-    lock: bool = False,
-    ext: str | None = None,
-    python_version: str | None = None,
-) -> str:
-    if isinstance(path, Path):
-        if not path.exists():
-            raise ValueError(f"Passed path {path} that does not exist")
-        else:
-            path = str(path)
-    else:
-        if not Path(path).exists():
-            inferred = session_environment_filename(
-                name=path, ext=ext, python_version=python_version, lock=lock
-            )
-            if Path(inferred).exists():
-                path = inferred
-            else:
-                raise ValueError(f"no file {path} found/inferred")
-
-    return path
-
-
-def _verify_paths(
-    paths: PathLike | Iterable[PathLike] | None,
-    lock: bool = False,
-    ext: str | None = None,
-    python_version: str | None = None,
-) -> list[str]:
-    if paths is None:
-        return []
-    elif isinstance(paths, (str, Path)):
-        paths = [paths]
-
-    return [_verify_path(p) for p in paths]
 
 
 def _remove_whitespace(s: str) -> str:
