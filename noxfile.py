@@ -238,10 +238,14 @@ DIST_PYPI_CMD_CLI = Annotated[
 # * Environments------------------------------------------------------------------------
 # ** Dev (conda)
 
-# def example(session: Session, hello: str ="hello") -> None:
-#     print('hello:', hello)
-#     print(session.name)
-#     print(type(session.virtualenv))
+
+@nox.session(name="example-venv", **DEFAULT_KWS)
+@nox.session(**CONDA_DEFAULT_KWS)
+def example(session: Session, hello: str = "hello") -> None:
+    print("hello:", hello)
+    print(session.name)
+    print(type(session.virtualenv))
+
 
 # example_venv = group_session(example, name="example-venv", **DEFAULT_KWS)
 # example = CONDA_DEFAULT_SESSION(example)
