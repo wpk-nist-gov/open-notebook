@@ -17,6 +17,7 @@ from typing import (
     Sequence,
     TypeVar,
     cast,
+    overload,
 )
 
 if sys.version_info > (3, 10):
@@ -37,9 +38,9 @@ from noxopt import NoxOpt, Option, Session  # type: ignore[unused-ignore,import]
 sys.path.insert(0, ".")
 
 from tools.noxtools import (
-    InstallerConda,
-    InstallerVenv,
+    Installer,
     combine_list_str,
+    is_conda_session,
     load_nox_config,
     open_webpage,
     prepend_flag,
@@ -86,8 +87,11 @@ elif shutil.which("conda"):
 else:
     raise ValueError("neither conda or mamba found")
 
-SESSION_DEFAULT_KWS = {"python": PYTHON_DEFAULT_VERSION, "venv_backend": CONDA_BACKEND}
-SESSION_ALL_KWS = {"python": PYTHON_ALL_VERSIONS, "venv_backend": CONDA_BACKEND}
+CONDA_DEFAULT_KWS = {"python": PYTHON_DEFAULT_VERSION, "venv_backend": CONDA_BACKEND}
+CONDA_ALL_KWS = {"python": PYTHON_ALL_VERSIONS, "venv_backend": CONDA_BACKEND}
+
+DEFAULT_KWS = {"python": PYTHON_DEFAULT_VERSION}
+ALL_KWS = {"python": PYTHON_ALL_VERSIONS}
 
 
 # * noxopt -----------------------------------------------------------------------------
@@ -96,14 +100,36 @@ group = NoxOpt(auto_tag=True)
 F = TypeVar("F", bound=Callable[..., Any])
 C: TypeAlias = Callable[[F], F]
 
-DEFAULT_SESSION = cast(C[F], group.session(**SESSION_DEFAULT_KWS))  # type: ignore
-ALL_SESSION = cast(C[F], group.session(**SESSION_ALL_KWS))  # type: ignore
 
-DEFAULT_SESSION_VENV = cast(C[F], group.session(python=PYTHON_DEFAULT_VERSION))  # type: ignore
-ALL_SESSION_VENV = cast(C[F], group.session(python=PYTHON_ALL_VERSIONS))  # type: ignore
+@overload
+def group_session(func: F, **kwargs: Any) -> F:
+    ...
+
+
+@overload
+def group_session(**kwargs: Any) -> Callable[[F], F]:
+    ...
+
+
+def group_session(func: F | None, **kwargs: Any) -> F | Callable[[F], F]:
+    return group.session(func, **kwargs)  # type: ignore
+
+
+# CONDA_DEFAULT_SESSION = group_session(None, **CONDA_DEFAULT_KWS)
+# CONDA_ALL_SESSION = group_session(None, **CONDA_ALL_KWS)
+
+# DEFAULT_SESSION = group_session(None, **DEFAULT_KWS)
+# ALL_SESSION = group_session(None, **)
+
+
+CONDA_DEFAULT_SESSION = cast(C[F], group.session(**CONDA_DEFAULT_KWS))  # type: ignore
+CONDA_ALL_SESSION = cast(C[F], group.session(**CONDA_ALL_KWS))  # type: ignore
+
+DEFAULT_SESSION = cast(C[F], group.session(python=PYTHON_DEFAULT_VERSION))  # type: ignore
+ALL_SESSION = cast(C[F], group.session(python=PYTHON_ALL_VERSIONS))  # type: ignore
 
 NOPYTHON_SESSION = cast(C[F], group.session(python=False))  # type: ignore
-INHERITED_SESSION_VENV = cast(C[F], group.session)  # type: ignore
+INHERITED_SESSION = cast(C[F], group.session)  # type: ignore
 
 OPTS_OPT = Option(nargs="*", type=str)
 RUN_OPT = Option(
@@ -120,16 +146,6 @@ LOCK_OPT = Option(type=bool, help="If True, use conda-lock")
 OPT_TYPE: TypeAlias = list[str] | None
 CMD_TYPE: TypeAlias = list[str] | None
 RUN_TYPE: TypeAlias = list[list[str]] | None
-
-
-# def opts_annotated(**kwargs: Any):  # type: ignore[unused-ignore,no-untyped-def]
-#     return Annotated["list[str] | None", replace(OPTS_OPT, **kwargs)]
-
-# def cmd_annotated(**kwargs: Any):  # type: ignore[unused-ignore,no-untyped-def]
-#     return Annotated["list[str] | None", replace(CMD_OPT, **kwargs)]
-
-# def run_annotated(**kwargs: Any):  # type: ignore[unused-ignore,no-untyped-def]
-#     return Annotated["list[list[str]] | None", replace(RUN_OPT, **kwargs)]
 
 
 def opts_replace(**kwargs: Any) -> Option:
@@ -222,8 +238,15 @@ DIST_PYPI_CMD_CLI = Annotated[
 # * Environments------------------------------------------------------------------------
 # ** Dev (conda)
 
+# def example(session: Session, hello: str ="hello") -> None:
+#     print('hello:', hello)
+#     print(session.name)
+#     print(type(session.virtualenv))
 
-@DEFAULT_SESSION
+# example_venv = group_session(example, name="example-venv", **DEFAULT_KWS)
+# example = CONDA_DEFAULT_SESSION(example)
+
+
 def dev(
     session: Session,
     dev_run: RUN_CLI = None,
@@ -236,39 +259,20 @@ def dev(
     # using conda
 
     (
-        InstallerConda.from_params(
-            session=session, base_name="dev", lock=lock, update=update, package="."
+        Installer.from_envname(
+            session=session, envname="dev", lock=lock, update=update, package="."
         )
-        .install_all(update_package=update_package, log_session=log_session)
-        .set_ipykernel_display_name(f"{PACKAGE_NAME}-dev")
+        .install_all(
+            update_package=update_package,
+            log_session=log_session,
+            display_name=f"{PACKAGE_NAME}-{session.name}",
+        )
         .run_commands(dev_run)
     )
 
 
-# ** Dev (virtualenv)
-@DEFAULT_SESSION_VENV
-def dev_venv(
-    session: Session,
-    dev_run: RUN_CLI = None,
-    lock: LOCK_CLI = False,
-    update: UPDATE_CLI = False,
-    update_package: UPDATE_PACKAGE_CLI = False,
-    log_session: bool = False,
-) -> None:
-    """Create dev env using virtualenv."""
-    # using conda
-
-    (
-        InstallerVenv.from_params(
-            session=session,
-            base_name="dev",
-            lock=lock,
-            update=update,
-            package=".",
-        )
-        .install_all(update_package=update_package, log_session=log_session)
-        .run_commands(dev_run)
-    )
+dev_venv = group_session(func=dev, name="dev-venv", **DEFAULT_KWS)
+dev = group_session(func=dev, **CONDA_DEFAULT_KWS)
 
 
 # ** bootstrap
@@ -309,7 +313,7 @@ def pyproject2conda(
     session.notify("requirements")
 
 
-@INHERITED_SESSION_VENV
+@INHERITED_SESSION
 def requirements(
     session: Session,
     update: UPDATE_CLI = False,
@@ -323,7 +327,7 @@ def requirements(
     """
 
     (
-        InstallerVenv(
+        Installer(
             session=session,
             pip_deps="pyproject2conda>=0.8.0",
             update=update,
@@ -339,7 +343,7 @@ def requirements(
 
 
 # ** conda-lock
-@DEFAULT_SESSION_VENV
+@DEFAULT_SESSION
 def conda_lock(
     session: Session,
     update: UPDATE_CLI = False,
@@ -363,7 +367,7 @@ def conda_lock(
     """Create lock files using conda-lock."""
 
     (
-        InstallerVenv.from_params(
+        Installer(
             session=session,
             pip_deps="conda-lock>=2.2.0",
             update=update,
@@ -453,7 +457,6 @@ def _test(
         session.run("pytest", *opts)
 
 
-@ALL_SESSION
 def test(
     session: Session,
     test_no_pytest: bool = False,
@@ -466,11 +469,10 @@ def test(
     no_cov: bool = False,
 ) -> None:
     """Test environments with conda installs."""
-
     (
-        InstallerConda.from_params(
+        Installer.from_envname(
             session=session,
-            base_name="test",
+            envname="test",
             lock=lock,
             package=".",
             update=update,
@@ -486,73 +488,12 @@ def test(
     )
 
 
-@ALL_SESSION_VENV
-def test_venv(
-    session: Session,
-    test_no_pytest: bool = False,
-    test_opts: TEST_OPTS_CLI = None,
-    test_run: RUN_CLI = None,
-    lock: LOCK_CLI = False,
-    update: UPDATE_CLI = False,
-    update_package: UPDATE_PACKAGE_CLI = False,
-    log_session: bool = False,
-    no_cov: bool = False,
-) -> None:
-    """Test environments virtualenv and pip installs."""
-
-    (
-        InstallerVenv.from_params(
-            session=session,
-            base_name="test",
-            lock=lock,
-            package=".",
-            update=update,
-        ).install_all(update_package=update_package, log_session=log_session)
-    )
-
-    _test(
-        session=session,
-        run=test_run,
-        test_no_pytest=test_no_pytest,
-        test_opts=test_opts,
-        no_cov=no_cov,
-    )
+test_venv = group_session(test, name="test-venv", **ALL_KWS)
+test = group_session(test, name="test", **CONDA_ALL_KWS)
 
 
 # ** coverage
-def _coverage(
-    session: nox.Session,
-    run: RUN_TYPE,
-    cmd: CMD_TYPE,
-    run_internal: RUN_TYPE,
-) -> None:
-    session_run_commands(session, run)
-
-    if cmd is None:
-        cmd = []
-
-    if not cmd and not run and not run_internal:
-        cmd = ["combine", "html"]
-
-    session.log(f"{cmd}")
-
-    for c in cmd:
-        if c == "combine":
-            paths = list(
-                Path(session.virtualenv.location).parent.glob("test-3*/tmp/.coverage")
-            )
-            if update_target(".coverage", *paths):
-                session.run("coverage", "combine", "--keep", "-a", *map(str, paths))
-        elif c == "open":
-            open_webpage(path="htmlcov/index.html")
-        else:
-            session.run("coverage", c)
-
-    session_run_commands(session, run)
-    session_run_commands(session, run_internal, external=False)
-
-
-@INHERITED_SESSION_VENV
+@INHERITED_SESSION
 def coverage(
     session: Session,
     coverage_cmd: Annotated[
@@ -562,29 +503,67 @@ def coverage(
     coverage_run_internal: RUN_CLI = None,
     update: UPDATE_CLI = False,
 ) -> None:
-    (
-        InstallerVenv(
-            session=session, pip_deps="coverage[toml]", update=update
-        ).install_all()
-    )
+    runner = Installer(
+        session=session, pip_deps="coverage[toml]", update=update
+    ).install_all()
 
-    _coverage(
-        session=session,
-        run=coverage_run,
-        cmd=coverage_cmd,
-        run_internal=coverage_run_internal,
-    )
+    runner.run_commands(coverage_run)
+
+    cmd = coverage_cmd or []
+    if not cmd and not coverage_run and not coverage_run_internal:
+        cmd = ["combine", "html", "report"]
+
+    session.log(f"{cmd}")
+
+    for c in cmd:
+        if c == "combine":
+            paths = list(
+                Path(session.virtualenv.location).parent.glob("test-*/tmp/.coverage")
+            )
+            if update_target(".coverage", *paths):
+                session.run("coverage", "combine", "--keep", "-a", *map(str, paths))
+        elif c == "open":
+            open_webpage(path="htmlcov/index.html")
+        else:
+            session.run("coverage", c)
+
+    runner.run_commands(coverage_run_internal)
 
 
 # ** Docs
-def _docs(session: nox.Session, run: RUN_TYPE, cmd: CMD_TYPE, version: str) -> None:
+def docs(
+    session: nox.Session,
+    docs_cmd: DOC_CMD_CLI = None,
+    docs_run: RUN_CLI = None,
+    lock: LOCK_CLI = False,
+    update: UPDATE_CLI = False,
+    update_package: UPDATE_PACKAGE_CLI = False,
+    version: VERSION_CLI = "",
+    log_session: bool = False,
+) -> None:
+    """
+    Runs make in docs directory. For example, 'nox -s docs -- --docs-cmd
+    html' -> 'make -C docs html'. With 'release' option, you can set the
+    message with 'message=...' in posargs.
+    """
+
+    runner = Installer.from_envname(
+        session=session, envname="docs", lock=lock, package=".", update=update
+    ).install_all(
+        update_package=update_package,
+        log_session=log_session,
+        display_name=f"{PACKAGE_NAME}-docs",
+    )
+
+    # _docs(session=session, cmd=docs_cmd, run=docs_run, version=version)
+
     if version:
         session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = version
 
-    session_run_commands(session, run)
+    runner.run_commands(docs_run)
 
-    cmd = cmd or []
-    if not run and not cmd:
+    cmd = docs_cmd or []
+    if not docs_run and not cmd:
         cmd = ["html"]
 
     if "symlink" in cmd:
@@ -618,66 +597,37 @@ def _docs(session: nox.Session, run: RUN_TYPE, cmd: CMD_TYPE, version: str) -> N
         )
 
 
-@DEFAULT_SESSION
-def docs(
-    session: nox.Session,
-    docs_cmd: DOC_CMD_CLI = None,
-    docs_run: RUN_CLI = None,
-    lock: LOCK_CLI = False,
-    update: UPDATE_CLI = False,
-    update_package: UPDATE_PACKAGE_CLI = False,
-    version: VERSION_CLI = "",
-    log_session: bool = False,
-) -> None:
-    """Runs make in docs directory. For example, 'nox -s docs -- --docs-cmd html' -> 'make -C docs html'. With 'release' option, you can set the message with 'message=...' in posargs."""
-
-    (
-        InstallerConda.from_params(
-            session=session, base_name="docs", lock=lock, package=".", update=update
-        )
-        .install_all(update_package=update_package, log_session=log_session)
-        .set_ipykernel_display_name(f"{PACKAGE_NAME}-docs")
-    )
-
-    _docs(session=session, cmd=docs_cmd, run=docs_run, version=version)
-
-
-@DEFAULT_SESSION_VENV
-def docs_venv(
-    session: nox.Session,
-    docs_cmd: DOC_CMD_CLI = None,
-    docs_run: RUN_CLI = None,
-    lock: LOCK_CLI = False,
-    update: UPDATE_CLI = False,
-    update_package: UPDATE_PACKAGE_CLI = False,
-    version: VERSION_CLI = "",
-    log_session: bool = False,
-) -> None:
-    """Runs make in docs directory. For example, 'nox -s docs -- --docs-cmd html' -> 'make -C docs html'. With 'release' option, you can set the message with 'message=...' in posargs."""
-
-    (
-        InstallerVenv.from_params(
-            session=session,
-            base_name="docs",
-            lock=lock,
-            package=".",
-            update=update,
-        ).install_all(update_package=update_package, log_session=log_session)
-        # .set_ipykernel_display_name(f"{PACKAGE_NAME}-docs")
-    )
-
-    _docs(session=session, cmd=docs_cmd, run=docs_run, version=version)
+docs_venv = group_session(docs, name="docs-venv", **DEFAULT_KWS)
+docs = group_session(docs, name="docs", **CONDA_DEFAULT_KWS)
 
 
 # ** Dist pypi
-def _dist_pypi(
-    session: nox.Session, run: RUN_TYPE, cmd: CMD_TYPE, version: str
+@DEFAULT_SESSION
+def dist_pypi(
+    session: nox.Session,
+    dist_pypi_run: RUN_CLI = None,
+    dist_pypi_cmd: DIST_PYPI_CMD_CLI = None,
+    update: UPDATE_CLI = False,
+    version: VERSION_CLI = "",
+    log_session: bool = False,
 ) -> None:
+    """Run 'nox -s dist-pypi -- {clean, build, testrelease, release}'."""
+
+    runner = Installer.from_envname(
+        session=session,
+        envname="dist-pypi",
+        update=update,
+    ).install_all(log_session=log_session)
+
     if version:
         session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = version
-    session_run_commands(session, run)
-    if not run and not cmd:
+
+    runner.run_commands(dist_pypi_run)
+
+    cmd = dist_pypi_cmd or []
+    if not dist_pypi_run and not cmd:
         cmd = ["build"]
+
     if cmd:
         if "build" in cmd:
             cmd.append("clean")
@@ -698,63 +648,8 @@ def _dist_pypi(
                 session.run("twine", "upload", "dist/*")
 
 
-@DEFAULT_SESSION_VENV
-def dist_pypi(
-    session: nox.Session,
-    dist_pypi_run: RUN_CLI = None,
-    dist_pypi_cmd: DIST_PYPI_CMD_CLI = None,
-    update: UPDATE_CLI = False,
-    version: VERSION_CLI = "",
-    log_session: bool = False,
-) -> None:
-    """Run 'nox -s dist-pypi -- {clean, build, testrelease, release}'."""
-
-    (
-        InstallerVenv.from_params(
-            session=session,
-            base_name="dist-pypi",
-            update=update,
-        ).install_all(log_session=log_session)
-    )
-
-    _dist_pypi(
-        session=session,
-        run=dist_pypi_run,
-        cmd=dist_pypi_cmd,
-        version=version,
-    )
-
-
-@DEFAULT_SESSION
-def dist_pypi_condaenv(
-    session: nox.Session,
-    dist_pypi_run: RUN_CLI = None,
-    dist_pypi_cmd: DIST_PYPI_CMD_CLI = None,
-    update: UPDATE_CLI = False,
-    version: VERSION_CLI = "",
-    log_session: bool = False,
-) -> None:
-    """Run 'nox -s dist_pypi -- {clean, build, testrelease, release}'."""
-    # conda
-
-    (
-        InstallerConda.from_params(
-            session=session,
-            base_name="dist-pypi",
-            update=update,
-        ).install_all(log_session=log_session)
-    )
-
-    _dist_pypi(
-        session=session,
-        run=dist_pypi_run,
-        cmd=dist_pypi_cmd,
-        version=version,
-    )
-
-
 # ** Dist conda
-@DEFAULT_SESSION
+@CONDA_DEFAULT_SESSION
 def dist_conda(
     session: nox.Session,
     dist_conda_run: RUN_CLI = None,
@@ -779,8 +674,8 @@ def dist_conda(
 ) -> None:
     """Runs make -C dist-conda posargs."""
 
-    runner = InstallerConda.from_params(
-        session=session, base_name="dist-conda", update=update
+    runner = Installer.from_envname(
+        session=session, envname="dist-conda", update=update
     ).install_all(log_session=log_session)
 
     run, cmd = dist_conda_run, dist_conda_cmd
@@ -861,7 +756,7 @@ def dist_conda(
 
 
 # ** lint
-@INHERITED_SESSION_VENV
+@INHERITED_SESSION
 def lint(
     session: nox.Session,
     lint_run: RUN_CLI = None,
@@ -876,7 +771,7 @@ def lint(
     `nox -s lint -- --lint-run "pre-commit run --hook-stage manual --all-files`
     """
 
-    runner = InstallerVenv(
+    runner = Installer(
         session=session, pip_deps="pre-commit", update=update
     ).install_all(log_session=log_session)
 
@@ -887,16 +782,45 @@ def lint(
 
 
 # ** type checking
-def _typing(
+def typing(
     session: nox.Session,
-    run: RUN_TYPE,
-    cmd: CMD_TYPE,
-    run_internal: RUN_TYPE,
+    typing_cmd: Annotated[
+        CMD_TYPE,
+        cmd_replace(
+            choices=[
+                "clean",
+                "mypy",
+                "pyright",
+                "pytype",
+                "all",
+                "nbqa-mypy",
+                "nbqa-pyright",
+                "nbqa-typing",
+            ],
+            flags=("--typing-cmd", "-m"),
+        ),
+    ] = None,
+    typing_run: RUN_CLI = None,
+    typing_run_internal: RUN_INTERNAL_CLI = None,
+    lock: LOCK_CLI = False,
+    update: UPDATE_CLI = False,
+    log_session: bool = False,
 ) -> None:
-    session_run_commands(session, run)
+    """Run type checkers (mypy, pyright, pytype)."""
 
-    cmd = cmd or []
-    if not run and not run_internal and not cmd:
+    runner = (
+        Installer.from_envname(
+            session=session,
+            envname="typing",
+            lock=lock,
+            update=update,
+        )
+        .install_all(log_session=log_session)
+        .run_commands(typing_run)
+    )
+
+    cmd = typing_cmd or []
+    if not typing_run and not typing_run_internal and not cmd:
         cmd = ["mypy", "pyright"]
 
     if "all" in cmd:
@@ -931,92 +855,20 @@ def _typing(
             session.run("make", c, external=True)
         else:
             session.log(f"skipping unknown command {c}")
-    session_run_commands(session, run_internal, external=False)
+
+    runner.run_commands(typing_run_internal, external=False)
 
 
-TYPING_CMD_CLI = Annotated[
-    CMD_TYPE,
-    cmd_replace(
-        choices=[
-            "clean",
-            "mypy",
-            "pyright",
-            "pytype",
-            "all",
-            "nbqa-mypy",
-            "nbqa-pyright",
-            "nbqa-typing",
-        ],
-        flags=("--typing-cmd", "-m"),
-    ),
-]
-
-
-@ALL_SESSION
-def typing(
-    session: nox.Session,
-    typing_cmd: TYPING_CMD_CLI = None,
-    typing_run: RUN_CLI = None,
-    typing_run_internal: RUN_INTERNAL_CLI = None,
-    lock: LOCK_CLI = False,
-    update: UPDATE_CLI = False,
-    log_session: bool = False,
-) -> None:
-    """Run type checkers (mypy, pyright, pytype)."""
-
-    (
-        InstallerConda.from_params(
-            session=session,
-            base_name="typing",
-            lock=lock,
-            update=update,
-        ).install_all(log_session=log_session)
-    )
-
-    _typing(
-        session=session,
-        run=typing_run,
-        cmd=typing_cmd,
-        run_internal=typing_run_internal,
-    )
-
-
-@ALL_SESSION_VENV
-def typing_venv(
-    session: nox.Session,
-    typing_cmd: TYPING_CMD_CLI = None,
-    typing_run: RUN_CLI = None,
-    typing_run_internal: RUN_INTERNAL_CLI = None,
-    lock: LOCK_CLI = False,
-    update: UPDATE_CLI = False,
-    log_session: bool = False,
-) -> None:
-    """Run type checkers (mypy, pyright, pytype)."""
-
-    (
-        InstallerVenv.from_params(
-            session=session,
-            base_name="typing",
-            lock=lock,
-            update=update,
-        ).install_all(log_session=log_session)
-    )
-
-    _typing(
-        session=session,
-        run=typing_run,
-        cmd=typing_cmd,
-        run_internal=typing_run_internal,
-    )
+typing_venv = group_session(typing, name="typing-venv", **ALL_KWS)
+typing = group_session(typing, name="typing", **CONDA_ALL_KWS)
 
 
 # ** testdist (conda)
-@ALL_SESSION
-def testdist_conda(
+def _testdist(
     session: Session,
     test_no_pytest: bool = False,
     test_opts: TEST_OPTS_CLI = None,
-    testdist_conda_run: RUN_CLI = None,
+    testdist_run: RUN_CLI = None,
     update: UPDATE_CLI = False,
     version: VERSION_CLI = "",
     log_session: bool = False,
@@ -1027,11 +879,17 @@ def testdist_conda(
     if version:
         install_str = f"{install_str}=={version}"
 
+    if is_conda_session(session):
+        pip_deps, conda_deps = None, install_str
+    else:
+        pip_deps, conda_deps = install_str, None
+
     (
-        InstallerConda.from_params(
+        Installer.from_envname(
             session=session,
-            base_name="test-extras",
-            conda_deps=install_str,
+            envname="test-extras",
+            conda_deps=conda_deps,
+            pip_deps=pip_deps,
             update=update,
             channels="conda-forge",
         ).install_all(log_session=log_session)
@@ -1039,90 +897,15 @@ def testdist_conda(
 
     _test(
         session=session,
-        run=testdist_conda_run,
+        run=testdist_run,
         test_no_pytest=test_no_pytest,
         test_opts=test_opts,
         no_cov=True,
     )
 
 
-# ** testdist (pypi)
-@ALL_SESSION_VENV
-def testdist_pypi(
-    session: Session,
-    test_no_pytest: bool = False,
-    test_opts: TEST_OPTS_CLI = None,
-    testdist_pypi_run: RUN_CLI = None,
-    testdist_pypi_extras: EXTRAS_CLI = None,
-    update: UPDATE_CLI = False,
-    version: VERSION_CLI = "",
-    log_session: bool = False,
-) -> None:
-    """Test pypi distribution."""
-    extras = testdist_pypi_extras
-    install_str = PACKAGE_NAME
-    if extras:
-        install_str = "{}[{}]".format(install_str, ",".join(extras))
-
-    if version:
-        install_str = f"{install_str}=={version}"
-
-    (
-        InstallerVenv.from_params(
-            session=session,
-            base_name="test-extras",
-            pip_deps=install_str,
-            update=update,
-        ).install_all(log_session=log_session)
-    )
-
-    _test(
-        session=session,
-        run=testdist_pypi_run,
-        test_no_pytest=test_no_pytest,
-        test_opts=test_opts,
-        no_cov=True,
-    )
-
-
-@ALL_SESSION
-def testdist_pypi_condaenv(
-    session: Session,
-    test_no_pytest: bool = False,
-    test_opts: TEST_OPTS_CLI = None,
-    testdist_pypi_run: RUN_CLI = None,
-    testdist_pypi_extras: EXTRAS_CLI = None,
-    update: UPDATE_CLI = False,
-    version: VERSION_CLI = "",
-    log_session: bool = False,
-) -> None:
-    """Test pypi distribution."""
-    extras = testdist_pypi_extras
-    install_str = PACKAGE_NAME
-
-    if extras:
-        install_str = "{}[{}]".format(install_str, ",".join(extras))
-
-    if version:
-        install_str = f"{install_str}=={version}"
-
-    (
-        InstallerConda.from_params(
-            session=session,
-            base_name="test-extras",
-            pip_deps=install_str,
-            update=update,
-            channels="conda-forge",
-        ).install_all(log_session=log_session)
-    )
-
-    _test(
-        session=session,
-        run=testdist_pypi_run,
-        test_no_pytest=test_no_pytest,
-        test_opts=test_opts,
-        no_cov=True,
-    )
+testdist_pypi = group_session(_testdist, name="testdist-pypi", **ALL_KWS)
+testdist_conda = group_session(_testdist, name="testdist-conda", **CONDA_ALL_KWS)
 
 
 # * Utilities --------------------------------------------------------------------------
@@ -1196,7 +979,7 @@ def _append_recipe(recipe_path: str, append_path: str) -> None:
 # # If want separate env for updating/reporting version with setuptools-scm
 # # We do this from dev environment.
 # # ** version report/update
-# @DEFAULT_SESSION_VENV
+# @DEFAULT_SESSION
 # def version_scm(
 #     session: Session,
 #     version: VERSION_CLI = "",

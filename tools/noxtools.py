@@ -31,7 +31,26 @@ def py_prefix(python_version: Any) -> str:
         raise ValueError(f"passed non-string value {python_version}")
 
 
-def session_environment_filename(
+def _verify_path(
+    path: PathLike,
+) -> str:
+    if not Path(path).is_file():
+        raise ValueError(f"Path {path} is not a file")
+    return str(path)
+
+
+def _verify_paths(
+    paths: PathLike | Iterable[PathLike] | None,
+) -> list[str]:
+    if paths is None:
+        return []
+    elif isinstance(paths, (str, Path)):
+        paths = [paths]
+
+    return [_verify_path(p) for p in paths]
+
+
+def _infer_path(
     name: str | None,
     ext: str | None = None,
     python_version: str | None = None,
@@ -64,53 +83,29 @@ def session_environment_filename(
     else:
         filename = f"./requirements/{filename}"
 
-    assert Path(filename).exists(), f"{filename} does not exist."
+    assert Path(filename).is_file(), f"{filename} does not exist."
 
     return filename
 
 
-def _verify_path(
-    path: PathLike,
-    lock: bool = False,
-    ext: str | None = None,
-    python_version: str | None = None,
-) -> str:
-    if isinstance(path, Path):
-        if not path.exists():
-            raise ValueError(f"Passed path {path} that does not exist")
-        else:
-            path = str(path)
-    else:
-        if not Path(path).exists():
-            inferred = session_environment_filename(
-                name=path, ext=ext, python_version=python_version, lock=lock
-            )
-            if Path(inferred).exists():
-                path = inferred
-            else:
-                raise ValueError(f"no file {path} found/inferred")
-
-    return path
-
-
-def _verify_paths(
-    paths: PathLike | Iterable[PathLike] | None,
+def _infer_paths(
+    names: str | Iterable[str] | None,
     lock: bool = False,
     ext: str | None = None,
     python_version: str | None = None,
 ) -> list[str]:
-    if paths is None:
+    if names is None:
         return []
-    elif isinstance(paths, (str, Path)):
-        paths = [paths]
+    elif isinstance(names, str):
+        names = [names]
 
     return [
-        _verify_path(p, lock=lock, ext=ext, python_version=python_version)
-        for p in paths
+        _infer_path(name, lock=lock, ext=ext, python_version=python_version)
+        for name in names
     ]
 
 
-def _is_conda_session(session: Session) -> bool:
+def is_conda_session(session: Session) -> bool:
     from nox.virtualenv import CondaEnv
 
     return isinstance(session.virtualenv, CondaEnv)
@@ -119,7 +114,7 @@ def _is_conda_session(session: Session) -> bool:
 # * Main class ----------------------------------------------------------------
 
 
-class InstallerVenv:
+class Installer:
     """
     Class to handle installing package/dependecies
 
@@ -133,7 +128,7 @@ class InstallerVenv:
         pip dependencies
     requirements : str or list of str
         pip requirement file(s) (pip install -r requirements[0] ...)
-        Can either be a full path or a basename (for example,
+        Can either be a full path or a envname (for example,
         "test" will get resolved to ./requirements/test.txt)
     constraints : str or list of str
         pip constraint file(s) (pip install -c ...)
@@ -141,10 +136,6 @@ class InstallerVenv:
         Where to save env config for furture comparison.  Defaults to
         `session.create_tmp() / "env.json"`.
     """
-
-    # keys to sae to config
-    _CONFIG_LIST_KEYS = ["package", "package_extras", "pip_deps"]
-    _CONFIG_PATH_KEYS = ["requirements", "constraints"]
 
     def __init__(
         self,
@@ -158,6 +149,10 @@ class InstallerVenv:
         requirements: PathLike | Iterable[PathLike] | None = None,
         constraints: PathLike | Iterable[PathLike] | None = None,
         config_path: PathLike | None = None,
+        # conda specific things:
+        conda_deps: str | Iterable[str] | None = None,
+        conda_lock_path: PathLike | None = None,
+        channels: str | Iterable[str] | None = None,
     ) -> None:
         self.session = session
 
@@ -177,8 +172,32 @@ class InstallerVenv:
 
         self.pip_deps: list[str] = sorted(_remove_whitespace_list(pip_deps or []))
 
-        self.requirements = sorted(_verify_paths(requirements, ext=".txt"))
-        self.constraints = sorted(_verify_paths(constraints, ext=".txt"))
+        self.requirements = sorted(_verify_paths(requirements))
+        self.constraints = sorted(_verify_paths(constraints))
+
+        # conda stuff
+        self.conda_deps: list[str] = sorted(_remove_whitespace_list(conda_deps or []))
+        self.channels: list[str] = sorted(_remove_whitespace_list(channels or []))
+
+        if self.lock and self.is_conda_session:
+            if conda_lock_path is None:
+                raise ValueError("Must pass conda")
+            if (
+                self.conda_deps
+                or self.channels
+                or self.pip_deps
+                or self.requirements
+                or self.constraints
+            ):
+                raise ValueError(
+                    "Can not pass conda_deps, channels, pip_deps, requirements, constraints if using conda-lock"
+                )
+
+            conda_lock_path = _verify_path(conda_lock_path)
+        else:
+            conda_lock_path = None
+
+        self.conda_lock_path = conda_lock_path
 
     @cached_property
     def config(self) -> dict[str, Any]:
@@ -186,12 +205,12 @@ class InstallerVenv:
         out: dict[str, Any] = {}
         out["lock"] = self.lock
 
-        for k in self._CONFIG_LIST_KEYS:
+        for k in ["package", "package_extras", "pip_deps", "conda_deps", "channels"]:
             if v := getattr(self, k):
                 out[k] = v
 
         # file hashses
-        for k in self._CONFIG_PATH_KEYS:
+        for k in ["requirements", "constraints", "conda_lock_path"]:
             if v := getattr(self, k):
                 if isinstance(v, str):
                     v = [v]
@@ -209,6 +228,20 @@ class InstallerVenv:
             json.dump(self.config, f)
         return self
 
+    def log_session(self) -> Self:
+        logfile = Path(self.session.create_tmp()) / "env_info.txt"
+        self.session.log(f"writing environment log to {logfile}")
+
+        with logfile.open("w") as f:
+            self.session.run("python", "--version", stdout=f)
+
+            if self.is_conda_session:
+                self.session.run("conda", "list", stdout=f, external=True)
+            else:
+                self.session.run("pip", "list", stdout=f)
+
+        return self
+
     @cached_property
     def previous_config(self) -> dict[str, Any]:
         if not self.config_path.exists():
@@ -218,6 +251,15 @@ class InstallerVenv:
 
             with self.config_path.open("r") as f:
                 return json.load(f)  # type: ignore
+
+    # Interface
+    @property
+    def python_version(self) -> str:
+        return cast(str, self.session.python)
+
+    @cached_property
+    def is_conda_session(self) -> bool:
+        return is_conda_session(self.session)
 
     @cached_property
     def skip_install(self) -> bool:
@@ -245,19 +287,6 @@ class InstallerVenv:
         #             print(self.session.log(f"{k} previous: {previous}"))
         # return out
 
-    # # Interface to self.session
-    # def run(self, *args, **kwargs) -> None:
-    #     self.session.run(*args, **kwargs)
-
-    # def log(self, *args, **kwargs) -> None:
-    #     self.session.log(*args, **kwargs)
-
-    # def pip_install(self, *args, **kwargs) -> None:
-    #     self.session.install(*args, **kwargs)
-
-    # def conda_install(self, *args, **kwargs) -> None:
-    #     self.session.conda_install(*args, **kwargs)
-
     # Smart runners
     def run_commands(
         self,
@@ -271,16 +300,17 @@ class InstallerVenv:
                 self.session.run(*opt, **kwargs)
         return self
 
-    def _log_session(self, stdout: TextIO) -> None:
-        self.session.run("pip", "list", stdout=stdout)
-
-    def log_session(self) -> Self:
-        logfile = Path(self.session.create_tmp()) / "env_info.txt"
-        self.session.log(f"writing environment log to {logfile}")
-
-        with logfile.open("w") as f:
-            self.session.run("python", "--version", stdout=f)
-            self._log_session(f)
+    def set_ipykernel_display_name(
+        self,
+        display_name: str | None = None,
+        update: bool = False,
+    ) -> Self:
+        if not display_name or (not self.is_conda_session) or self.skip_install:
+            pass
+        elif self.changed or update or self.update:
+            command = f"python -m ipykernel install --sys-prefix --display-name {display_name}".split()
+            # continue if fails
+            self.session.run(*command, success_codes=[0, 1])
 
         return self
 
@@ -300,8 +330,14 @@ class InstallerVenv:
         update_package: bool = False,
         log_session: bool = False,
         save_config: bool = True,
+        display_name: str | None = None,
     ) -> Self:
-        out = self.pip_install_deps().pip_install_package(update=update_package)
+        out = (
+            (self.conda_install_deps() if self.is_conda_session else self)
+            .pip_install_deps()
+            .pip_install_package(update=update_package)
+            .set_ipykernel_display_name(display_name=display_name)
+        )
 
         if log_session:
             out = out.log_session()
@@ -350,9 +386,7 @@ class InstallerVenv:
         opts: str | Iterable[str] | None = None,
         **kwargs: Any,
     ) -> Self:
-        update = update or self.update
-
-        if (not self.pip_deps) or self.skip_install:
+        if self.skip_install:
             pass
 
         elif self.changed or (update := update or self.update):
@@ -362,127 +396,15 @@ class InstallerVenv:
                 + self.pip_deps
             )
 
-            if update:
-                install_args = ["--upgrade"] + install_args
+            if install_args:
+                if update:
+                    install_args = ["--upgrade"] + install_args
 
-            if opts:
-                install_args.extend(combine_list_str(opts))
-
-            self.session.install(*install_args, *args, **kwargs)
-
-        return self
-
-    @classmethod
-    def from_params(
-        cls,
-        session: Session,
-        base_name: str | None = None,
-        lock: bool = False,
-        **kwargs: Any,
-    ) -> Self:
-        if lock:
-            raise ValueError("lock not yet supported?")
-
-        if base_name is not None:
-            requirements = kwargs.get("requirements", [])
-            if isinstance(requirements, str):
-                requirements = [requirements]
-
-            new_requirement = session_environment_filename(name=base_name, ext=".txt")
-
-            if new_requirement not in requirements:
-                kwargs["requirements"] = list(requirements) + [new_requirement]
-
-        return cls(
-            session=session,
-            lock=lock,
-            **kwargs,
-        )
-
-
-class InstallerConda(InstallerVenv):
-    """
-    Class to handle installing dependencies in a conda environment.
-
-    Parameters
-    ----------
-    conda_deps :
-        conda dependencies
-    conda_lock_path :
-        Path of lock file
-    channels :
-        Conda channels.
-    """
-
-    _CONFIG_LIST_KEYS = InstallerVenv._CONFIG_LIST_KEYS + ["conda_deps", "channels"]
-    _CONFIG_PATH_KEYS = InstallerVenv._CONFIG_PATH_KEYS + ["conda_lock_path"]
-
-    def __init__(
-        self,
-        session: Session,
-        *,
-        update: bool = False,
-        lock: bool = False,
-        package: str | bool | None = None,
-        package_extras: str | Iterable[str] | None = None,
-        pip_deps: str | Iterable[str] | None = None,
-        requirements: PathLike | Iterable[PathLike] | None = None,
-        constraints: PathLike | Iterable[PathLike] | None = None,
-        config_path: PathLike | None = None,
-        # conda specific stuff:
-        conda_deps: str | Iterable[str] | None = None,
-        conda_lock_path: PathLike | None = None,
-        channels: str | Iterable[str] | None = None,
-    ):
-        super().__init__(
-            session=session,
-            update=update,
-            lock=lock,
-            package=package,
-            package_extras=package_extras,
-            pip_deps=pip_deps,
-            requirements=requirements,
-            constraints=constraints,
-            config_path=config_path,
-        )
-
-        self.conda_deps: list[str] = sorted(_remove_whitespace_list(conda_deps or []))
-        self.channels: list[str] = sorted(_remove_whitespace_list(channels or []))
-
-        if self.lock:
-            assert conda_lock_path is not None
-        self.conda_lock_path = conda_lock_path
-
-    def set_ipykernel_display_name(
-        self,
-        display_name: str | None = None,
-        update: bool = False,
-        check_skip_install: bool = True,
-    ) -> Self:
-        if not display_name or (check_skip_install and self.skip_install):
-            pass
-        elif self.changed or update or self.update:
-            command = f"python -m ipykernel install --sys-prefix --display-name {display_name}".split()
-            # continue if fails
-            self.session.run(*command, success_codes=[0, 1])
+                if opts:
+                    install_args.extend(combine_list_str(opts))
+                self.session.install(*install_args, *args, **kwargs)
 
         return self
-
-    def _log_session(self, stdout: TextIO) -> None:
-        self.session.run("conda", "list", stdout=stdout, external=True)
-
-    def install_all(
-        self,
-        update_package: bool = False,
-        log_session: bool = False,
-        save_config: bool = True,
-    ) -> Self:
-        self.conda_install_deps()
-        return super().install_all(
-            update_package=update_package,
-            log_session=log_session,
-            save_config=save_config,
-        )
 
     def conda_install_deps(
         self,
@@ -495,15 +417,15 @@ class InstallerConda(InstallerVenv):
         **kwargs: Any,
     ) -> Self:
         if self.lock:
-            return self._conda_install_deps(
+            return self._conda_install_lock(
                 update=update, extras=extras, opts=opts, **kwargs
             )
         else:
-            return self._conda_lock_install(
+            return self._conda_install_deps(
                 update=update, opts=opts, channels=channels, prune=prune, **kwargs
             )
 
-    def _conda_install_deps(
+    def _conda_install_lock(
         self,
         update: bool = False,
         extras: str | Iterable[str] | None = None,
@@ -532,7 +454,7 @@ class InstallerConda(InstallerVenv):
             if tmpdir := os.environ.get("TMPDIR"):
                 kwargs["env"] = {"TMPDIR": tmpdir}
 
-            self.session._run(
+            self.session.run_always(
                 "conda-lock",
                 "install",
                 "--mamba",
@@ -546,7 +468,7 @@ class InstallerConda(InstallerVenv):
 
         return self
 
-    def _conda_lock_install(
+    def _conda_install_deps(
         self,
         update: bool = False,
         opts: str | Iterable[str] | None = None,
@@ -581,17 +503,23 @@ class InstallerConda(InstallerVenv):
     def from_yaml(
         cls,
         session: Session,
-        paths: PathLike | Iterable[PathLike] | None,
+        envname: str | Iterable[str] | None = None,
+        paths: PathLike | Iterable[PathLike] | None = None,
         conda_deps: str | Iterable[str] | None = None,
         pip_deps: str | Iterable[str] | None = None,
         channels: str | Iterable[str] | None = None,
         remove_python: bool = True,
         **kwargs: Any,
     ) -> Self:
-        if paths:
+        if paths or envname:
             assert isinstance(session.python, str)
+
+            paths = _infer_paths(
+                envname, ext=".yaml", lock=False, python_version=session.python
+            ) + _verify_paths(paths)
+
             channels, conda_deps, pip_deps, _ = parse_envs(
-                *_verify_paths(paths or [], ext=".yaml", python_version=session.python),
+                *paths,
                 remove_python=remove_python,
                 deps=conda_deps,
                 reqs=pip_deps,
@@ -607,39 +535,321 @@ class InstallerConda(InstallerVenv):
         )
 
     @classmethod
-    def from_params(
+    def _from_envname_pip(
         cls,
         session: Session,
-        base_name: PathLike | Iterable[PathLike] | None = None,
+        envname: str | Iterable[str] | None = None,
         lock: bool = False,
+        requirements: PathLike | Iterable[PathLike] | None = None,
+        **kwargs: Any,
+    ) -> Self:
+        if lock:
+            raise ValueError("lock not yet supported?")
+
+        if envname is not None:
+            requirements = _verify_paths(requirements) + _infer_paths(
+                envname, ext=".txt"
+            )
+
+        return cls(
+            session=session,
+            lock=lock,
+            requirements=requirements,
+            **kwargs,
+        )
+
+    @classmethod
+    def _from_envname_conda(
+        cls,
+        session: Session,
+        envname: str | Iterable[str] | None = None,
+        lock: bool = False,
+        conda_lock_path: PathLike | None = None,
         **kwargs: Any,
     ) -> Self:
         """
         Parameters
         ----------
-        base_name :
+        envname :
             Base name for file.  For example, passing
-            base_name = "dev" will convert to
+            envname = "dev" will convert to
             `requirements/py{py}-dev.yaml` for `filename`
         """
 
         if lock:
-            # get files from base_name
-            assert isinstance(session.python, str)
-            paths = _verify_paths(
-                base_name or [], lock=lock, ext=".yaml", python_version=session.python
+            # get files from envname
+
+            if conda_lock_path is None:
+                assert isinstance(
+                    envname, str
+                ), "Must supply conda_lock_path or envname"
+                conda_lock_path = _infer_path(envname, ext=".yaml", python_version=session.python, lock=lock)  # type: ignore
+
+            return cls(
+                session=session, lock=lock, conda_lock_path=conda_lock_path, **kwargs
             )
 
-            if not paths or len(paths) != 1:
-                raise ValueError(
-                    "Must supply single lock file.  basename: {base_name}, filename: {filename}"
-                )
-
-            kwargs["conda_lock_path"] = paths[0]
-            return cls(session=session, lock=lock, **kwargs)
-
         else:
-            return cls.from_yaml(session=session, paths=base_name, lock=lock, **kwargs)
+            return cls.from_yaml(session=session, envname=envname, lock=lock, **kwargs)
+
+    @classmethod
+    def from_envname(
+        cls,
+        session: Session,
+        envname: str | Iterable[str] | None = None,
+        lock: bool = False,
+        **kwargs: Any,
+    ) -> Self:
+        if is_conda_session(session):
+            return cls._from_envname_conda(
+                session=session, envname=envname, lock=lock, **kwargs
+            )
+        else:
+            return cls._from_envname_pip(
+                session=session, envname=envname, lock=lock, **kwargs
+            )
+
+
+# class InstallerConda(InstallerVenv):
+#     """
+#     Class to handle installing dependencies in a conda environment.
+
+#     Parameters
+#     ----------
+#     conda_deps :
+#         conda dependencies
+#     conda_lock_path :
+#         Path of lock file
+#     channels :
+#         Conda channels.
+#     """
+
+#     _CONFIG_LIST_KEYS = InstallerVenv._CONFIG_LIST_KEYS + ["conda_deps", "channels"]
+#     _CONFIG_PATH_KEYS = InstallerVenv._CONFIG_PATH_KEYS + ["conda_lock_path"]
+
+#     def __init__(
+#         self,
+#         session: Session,
+#         *,
+#         update: bool = False,
+#         lock: bool = False,
+#         package: str | bool | None = None,
+#         package_extras: str | Iterable[str] | None = None,
+#         pip_deps: str | Iterable[str] | None = None,
+#         requirements: PathLike | Iterable[PathLike] | None = None,
+#         constraints: PathLike | Iterable[PathLike] | None = None,
+#         config_path: PathLike | None = None,
+#         # conda specific stuff:
+#         conda_deps: str | Iterable[str] | None = None,
+#         conda_lock_path: PathLike | None = None,
+#         channels: str | Iterable[str] | None = None,
+#     ):
+#         super().__init__(
+#             session=session,
+#             update=update,
+#             lock=lock,
+#             package=package,
+#             package_extras=package_extras,
+#             pip_deps=pip_deps,
+#             requirements=requirements,
+#             constraints=constraints,
+#             config_path=config_path,
+#         )
+
+#         self.conda_deps: list[str] = sorted(_remove_whitespace_list(conda_deps or []))
+#         self.channels: list[str] = sorted(_remove_whitespace_list(channels or []))
+
+#         if self.lock:
+#             assert conda_lock_path is not None
+#         self.conda_lock_path = conda_lock_path
+
+#     def set_ipykernel_display_name(
+#         self,
+#         display_name: str | None = None,
+#         update: bool = False,
+#         check_skip_install: bool = True,
+#     ) -> Self:
+#         if not display_name or (check_skip_install and self.skip_install):
+#             pass
+#         elif self.changed or update or self.update:
+#             command = f"python -m ipykernel install --sys-prefix --display-name {display_name}".split()
+#             # continue if fails
+#             self.session.run(*command, success_codes=[0, 1])
+
+#         return self
+
+#     def _log_session(self, stdout: TextIO) -> None:
+#         self.session.run("conda", "list", stdout=stdout, external=True)
+
+#     def install_all(
+#         self,
+#         update_package: bool = False,
+#         log_session: bool = False,
+#         save_config: bool = True,
+#     ) -> Self:
+#         self.conda_install_deps()
+#         return super().install_all(
+#             update_package=update_package,
+#             log_session=log_session,
+#             save_config=save_config,
+#         )
+
+#     def conda_install_deps(
+#         self,
+#         *args: Any,
+#         update: bool = False,
+#         prune: bool = True,
+#         extras: str | Iterable[str] | None = None,
+#         opts: str | Iterable[str] | None = None,
+#         channels: str | Iterable[str] | None = None,
+#         **kwargs: Any,
+#     ) -> Self:
+#         if self.lock:
+#             return self._conda_install_deps(
+#                 update=update, extras=extras, opts=opts, **kwargs
+#             )
+#         else:
+#             return self._conda_lock_install(
+#                 update=update, opts=opts, channels=channels, prune=prune, **kwargs
+#             )
+
+#     def _conda_install_deps(
+#         self,
+#         update: bool = False,
+#         extras: str | Iterable[str] | None = None,
+#         opts: str | Iterable[str] | None = None,
+#         **kwargs: Any,
+#     ) -> Self:
+#         if (not self.conda_lock_path) or self.skip_install:
+#             pass
+
+#         elif self.changed or (update := (update or self.update)):
+#             if extras:
+#                 if isinstance(extras, str):
+#                     extras = extras.split(",")
+#                 extras = prepend_flag("--extras", extras)
+#             else:
+#                 extras = []
+
+#             if opts:
+#                 opts = combine_list_str(opts)
+#             else:
+#                 opts = []
+
+#             kwargs.setdefault("silent", True)
+#             kwargs["external"] = True
+
+#             if tmpdir := os.environ.get("TMPDIR"):
+#                 kwargs["env"] = {"TMPDIR": tmpdir}
+
+#             self.session._run(
+#                 "conda-lock",
+#                 "install",
+#                 "--mamba",
+#                 *extras,
+#                 *opts,
+#                 "-p",
+#                 str(self.session.virtualenv.location),
+#                 str(self.conda_lock_path),
+#                 **kwargs,
+#             )
+
+#         return self
+
+#     def _conda_lock_install(
+#         self,
+#         update: bool = False,
+#         opts: str | Iterable[str] | None = None,
+#         channels: str | Iterable[str] | None = None,
+#         prune: bool = True,
+#         **kwargs: Any,
+#     ) -> Self:
+#         if (not self.conda_deps) or self.skip_install:
+#             pass
+
+#         elif self.changed or (update := (update or self.update)):
+#             channels = channels or self.channels
+#             if channels:
+#                 kwargs.update(channel=channels)
+
+#             deps = list(self.conda_deps)
+#             if update:
+#                 deps.insert(0, "--update-all")
+
+#             if prune:
+#                 deps.insert(0, "--prune")
+
+#             if opts:
+#                 deps.extend(combine_list_str(opts))
+
+#             self.session.conda_install(*deps, **kwargs)
+
+#         return self
+
+#     # Super convenience methods
+#     @classmethod
+#     def from_yaml(
+#         cls,
+#         session: Session,
+#         paths: PathLike | Iterable[PathLike] | None,
+#         conda_deps: str | Iterable[str] | None = None,
+#         pip_deps: str | Iterable[str] | None = None,
+#         channels: str | Iterable[str] | None = None,
+#         remove_python: bool = True,
+#         **kwargs: Any,
+#     ) -> Self:
+#         if paths:
+#             assert isinstance(session.python, str)
+#             channels, conda_deps, pip_deps, _ = parse_envs(
+#                 *_verify_paths(paths or [], ext=".yaml", python_version=session.python),
+#                 remove_python=remove_python,
+#                 deps=conda_deps,
+#                 reqs=pip_deps,
+#                 channels=channels,
+#             )
+
+#         return cls(
+#             session=session,
+#             conda_deps=conda_deps,
+#             pip_deps=pip_deps,
+#             channels=channels,
+#             **kwargs,
+#         )
+
+#     @classmethod
+#     def from_params(
+#         cls,
+#         session: Session,
+#         envname: PathLike | Iterable[PathLike] | None = None,
+#         lock: bool = False,
+#         **kwargs: Any,
+#     ) -> Self:
+#         """
+#         Parameters
+#         ----------
+#         envname :
+#             Base name for file.  For example, passing
+#             envname = "dev" will convert to
+#             `requirements/py{py}-dev.yaml` for `filename`
+#         """
+
+#         if lock:
+#             # get files from envname
+#             assert isinstance(session.python, str)
+#             paths = _verify_paths(
+#                 envname or [], lock=lock, ext=".yaml", python_version=session.python
+#             )
+
+#             if not paths or len(paths) != 1:
+#                 raise ValueError(
+#                     "Must supply single lock file.  envname: {envname}, filename: {filename}"
+#                 )
+
+#             kwargs["conda_lock_path"] = paths[0]
+#             return cls(session=session, lock=lock, **kwargs)
+
+#         else:
+#             return cls.from_yaml(session=session, paths=envname, lock=lock, **kwargs)
 
 
 # * Utilities --------------------------------------------------------------------------
