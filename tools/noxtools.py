@@ -224,6 +224,7 @@ class Installer:
         # in case config path got clobbered
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
 
+        self.session.log(f"saving config to {self.config_path}")
         with open(self.config_path, "w") as f:
             json.dump(self.config, f)
         return self

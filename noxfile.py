@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 import sys
+from functools import lru_cache, wraps
 
 # Should only use on python version > 3.10
 assert sys.version_info >= (3, 10)
@@ -12,12 +13,10 @@ from dataclasses import replace  # noqa
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
     Iterator,
     Sequence,
-    TypeVar,
-    cast,
-    overload,
+    TypedDict,
+    Callable,
 )
 
 if sys.version_info > (3, 10):
@@ -31,12 +30,15 @@ else:
     from typing_extensions import Annotated
 
 
+from dataclasses import dataclass
+
 import nox  # type: ignore[unused-ignore,import]
-from noxopt import NoxOpt, Option, Session  # type: ignore[unused-ignore,import]
+from nox import Session
 
 # fmt: off
 sys.path.insert(0, ".")
 
+from tools.dataclass_parser import DataClassParserMixin, Option
 from tools.noxtools import (
     Installer,
     combine_list_str,
@@ -74,7 +76,7 @@ nox.options.envdir = f".nox/{PACKAGE_NAME}/envs"
 
 CONFIG = load_nox_config()
 
-# * Options ----------------------------------------------------------------------------
+# * Options ---------------------------------------------------------------------------
 
 PYTHON_ALL_VERSIONS = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 PYTHON_DEFAULT_VERSION = "3.11"
@@ -87,200 +89,240 @@ elif shutil.which("conda"):
 else:
     raise ValueError("neither conda or mamba found")
 
-CONDA_DEFAULT_KWS = {"python": PYTHON_DEFAULT_VERSION, "venv_backend": CONDA_BACKEND}
-CONDA_ALL_KWS = {"python": PYTHON_ALL_VERSIONS, "venv_backend": CONDA_BACKEND}
 
-DEFAULT_KWS = {"python": PYTHON_DEFAULT_VERSION}
-ALL_KWS = {"python": PYTHON_ALL_VERSIONS}
+class SessionOptionsDict(TypedDict, total=False):
+    """Dict for options to nox.session"""
 
-
-# * noxopt -----------------------------------------------------------------------------
-group = NoxOpt(auto_tag=True)
-
-F = TypeVar("F", bound=Callable[..., Any])
-C: TypeAlias = Callable[[F], F]
+    python: str | list[str]
+    venv_backend: str
 
 
-@overload
-def group_session(func: F, **kwargs: Any) -> F:
-    ...
+CONDA_DEFAULT_KWS: SessionOptionsDict = {
+    "python": PYTHON_DEFAULT_VERSION,
+    "venv_backend": CONDA_BACKEND,
+}
+CONDA_ALL_KWS: SessionOptionsDict = {
+    "python": PYTHON_ALL_VERSIONS,
+    "venv_backend": CONDA_BACKEND,
+}
+
+DEFAULT_KWS: SessionOptionsDict = {"python": PYTHON_DEFAULT_VERSION}
+ALL_KWS: SessionOptionsDict = {"python": PYTHON_ALL_VERSIONS}
 
 
-@overload
-def group_session(**kwargs: Any) -> Callable[[F], F]:
-    ...
-
-
-def group_session(func: F | None, **kwargs: Any) -> F | Callable[[F], F]:
-    return group.session(func, **kwargs)  # type: ignore
-
-
-# CONDA_DEFAULT_SESSION = group_session(None, **CONDA_DEFAULT_KWS)
-# CONDA_ALL_SESSION = group_session(None, **CONDA_ALL_KWS)
-
-# DEFAULT_SESSION = group_session(None, **DEFAULT_KWS)
-# ALL_SESSION = group_session(None, **)
-
-
-CONDA_DEFAULT_SESSION = cast(C[F], group.session(**CONDA_DEFAULT_KWS))  # type: ignore
-CONDA_ALL_SESSION = cast(C[F], group.session(**CONDA_ALL_KWS))  # type: ignore
-
-DEFAULT_SESSION = cast(C[F], group.session(python=PYTHON_DEFAULT_VERSION))  # type: ignore
-ALL_SESSION = cast(C[F], group.session(python=PYTHON_ALL_VERSIONS))  # type: ignore
-
-NOPYTHON_SESSION = cast(C[F], group.session(python=False))  # type: ignore
-INHERITED_SESSION = cast(C[F], group.session)  # type: ignore
-
-OPTS_OPT = Option(nargs="*", type=str)
-RUN_OPT = Option(
-    nargs="*",
-    type=str,
-    action="append",
-    help="run passed command_demo using `external=True` flag",
-)
-
-CMD_OPT = Option(nargs="*", type=str, help="cmd to be run")
-LOCK_OPT = Option(type=bool, help="If True, use conda-lock")
-
+# * Session command line options -------------------------------------------------------
 
 OPT_TYPE: TypeAlias = list[str] | None
 CMD_TYPE: TypeAlias = list[str] | None
 RUN_TYPE: TypeAlias = list[list[str]] | None
 
+RUN_OPTION = Option(
+    nargs="*",
+    type=str,
+    action="append",
+    help="Run passed command_demo using `external=True`",
+)
 
-def opts_replace(**kwargs: Any) -> Option:
-    return replace(OPTS_OPT, **kwargs)
+CMD_OPTION = Option(nargs="*", type=str, help="cmd to be run")
+OPT_OPTION = Option(nargs="*", type=str, help="options")
+
+
+def opt_replace(**kwargs: Any) -> Option:
+    return replace(OPT_OPTION, **kwargs)
 
 
 def cmd_replace(**kwargs: Any) -> Option:
-    return replace(CMD_OPT, **kwargs)
+    return replace(CMD_OPTION, **kwargs)
 
 
 def run_replace(**kwargs: Any) -> Option:
-    return replace(RUN_OPT, **kwargs)
+    return replace(RUN_OPTION, **kwargs)
 
 
-LOCK_CLI = Annotated[bool, LOCK_OPT]
-RUN_CLI = Annotated[RUN_TYPE, RUN_OPT]
-RUN_INTERNAL_CLI = Annotated[
-    RUN_TYPE, run_replace(help="run arbitrary internal command")
-]
+RUN_ANNOTATED = Annotated[RUN_TYPE, RUN_OPTION]
+CMD_ANNOTATED = Annotated[CMD_TYPE, CMD_OPTION]
+OPT_ANNOTATED = Annotated[OPT_TYPE, OPT_OPTION]
 
-TEST_OPTS_CLI = Annotated[
-    OPT_TYPE, opts_replace(help="extra arguments/flags to pytest")
-]
-EXTRAS_CLI = Annotated[OPT_TYPE, cmd_replace(help="extras to include from package")]
-PYTHON_PATHS_CLI = Annotated[
-    OPT_TYPE, cmd_replace(help="python paths to append to PATHS")
-]
-
-UPDATE_CLI = Annotated[
-    bool,
-    Option(
-        type=bool,
-        help="If True, force update of installed packages",
-        flags=("--update", "-U"),
-    ),
-]
-
-UPDATE_PACKAGE_CLI = Annotated[
-    bool,
-    Option(
-        type=bool,
-        help="If True, and session uses package, reinstall package",
-        flags=("--update-package", "-P"),
-    ),
-]
-
-VERSION_CLI = Annotated[
-    str, Option(type=str, help="Version to substitute or check against")
-]
-
-LOG_SESSION_CLI = Annotated[
-    bool,
-    Option(
-        type=bool,
-        help="If flag included, log python and package (if installed) version",
-    ),
-]
+RUN_INTERNAL_ANNOTATED = Annotated[RUN_TYPE, run_replace(help="Run internal commands")]
 
 
-DOC_CMD_CLI = Annotated[
-    CMD_TYPE,
-    cmd_replace(
-        choices=[
-            "html",
-            "build",
-            "symlink",
-            "clean",
-            "livehtml",
-            "linkcheck",
-            "spelling",
-            "showlinks",
-            "release",
-            "open",
-            "serve",
-        ],
-        flags=("--docs-cmd", "-d"),
-    ),
-]
+@dataclass
+class SessionParams(DataClassParserMixin):
+    """Data class for handling options to session"""
+
+    # common parameters
+    lock: bool = False
+    update: Annotated[
+        bool, Option(flags=("--update", "-U"), help="update dependencies")
+    ] = False
+    update_package: Annotated[bool, Option(flags=("--update-package", "-P"))] = False
+    log_session: Annotated[bool, Option(flags=("--log-session", "-L"))] = False
+    version: Annotated[str | None, Option(type=str)] = None
+
+    # dev
+    dev_run: RUN_ANNOTATED = None
+
+    # config
+    dev_extras: OPT_ANNOTATED = None
+    python_paths: OPT_ANNOTATED = None
+
+    # requirements
+    requirements_force: bool = False
+
+    # conda-lock
+    conda_lock_channel: Annotated[OPT_TYPE, opt_replace(help="conda channels")] = None
+    conda_lock_platform: Annotated[
+        OPT_TYPE,
+        opt_replace(
+            help="platforms to build lock files for",
+            choices=["osx-64", "linux-64", "win-64", "all"],
+        ),
+    ] = None
+    conda_lock_include: Annotated[
+        OPT_TYPE, opt_replace(help="lock files to create")
+    ] = None
+    conda_lock_run: RUN_ANNOTATED = None
+    conda_lock_mamba: bool = False
+    conda_lock_force: bool = False
+
+    # test
+    test_no_pytest: bool = False
+    test_opts: Annotated[OPT_TYPE, opt_replace(help="options to pytest")] = None
+    test_run: RUN_ANNOTATED = None
+    no_cov: bool = False
+
+    # coverage
+    coverage_cmd: Annotated[
+        CMD_TYPE, cmd_replace(choices=["erase", "combine", "report", "html", "open"])
+    ] = None
+    coverage_run: RUN_ANNOTATED = None
+    coverage_run_internal: RUN_ANNOTATED = None
+
+    # docs
+    docs_cmd: Annotated[
+        CMD_TYPE,
+        cmd_replace(
+            choices=[
+                "html",
+                "build",
+                "symlink",
+                "clean",
+                "livehtml",
+                "linkcheck",
+                "spelling",
+                "showlinks",
+                "release",
+                "open",
+                "serve",
+            ],
+            flags=("--docs-cmd", "-d"),
+        ),
+    ] = None
+    docs_run: RUN_ANNOTATED = None
+
+    # dist-pypi
+    dist_pypi_run: RUN_ANNOTATED = None
+    dist_pypi_cmd: Annotated[
+        CMD_TYPE,
+        cmd_replace(
+            choices=["clean", "build", "testrelease", "release"],
+            flags=("-p", "--dist-pypi-cmd"),
+        ),
+    ] = None
+
+    # dist-conda
+    dist_conda_run: RUN_ANNOTATED = None
+    dist_conda_cmd: Annotated[
+        CMD_TYPE,
+        cmd_replace(
+            choices=[
+                "recipe",
+                "build",
+                "clean",
+                "clean-recipe",
+                "clean-build",
+                "recipe-cat-full",
+            ],
+            flags=("--dist-conda-cmd", "-c"),
+        ),
+    ] = None
+    dist_conda_sdist_path: Annotated[str | None, Option(type=str)] = None
+
+    # lint (pre-commit)
+    lint_run: RUN_ANNOTATED = None
+
+    # typing
+    typing_cmd: Annotated[
+        CMD_TYPE,
+        cmd_replace(
+            choices=[
+                "clean",
+                "mypy",
+                "pyright",
+                "pytype",
+                "all",
+                "nbqa-mypy",
+                "nbqa-pyright",
+                "nbqa-typing",
+            ],
+            flags=("--typing-cmd", "-m"),
+        ),
+    ] = None
+    typing_run: RUN_ANNOTATED = None
+    typing_run_internal: RUN_INTERNAL_ANNOTATED = None
+
+    # testdist
+    testdist_run: RUN_ANNOTATED = None
 
 
-DIST_PYPI_CMD_CLI = Annotated[
-    CMD_TYPE,
-    cmd_replace(
-        choices=["clean", "build", "testrelease", "release"],
-        flags=("--dist-pypi-cmd", "-p"),
-    ),
-]
+@lru_cache
+def parse_posargs(*posargs: str) -> SessionParams:
+    return SessionParams.from_posargs(posargs=posargs, prefix_char="+")
+
+
+def add_opts(
+    func: Callable[[Session, SessionParams], None]
+) -> Callable[[Session], None]:
+    @wraps(func)
+    def wrapped(session: Session) -> None:
+        opts = parse_posargs(*session.posargs)
+        return func(session, opts)
+
+    return wrapped
 
 
 # * Environments------------------------------------------------------------------------
 # ** Dev (conda)
-
-
-@nox.session(name="example-venv", **DEFAULT_KWS)
-@nox.session(**CONDA_DEFAULT_KWS)
-def example(session: Session, hello: str = "hello") -> None:
-    print("hello:", hello)
-    print(session.name)
-    print(type(session.virtualenv))
-
-
-# example_venv = group_session(example, name="example-venv", **DEFAULT_KWS)
-# example = CONDA_DEFAULT_SESSION(example)
-
-
+@add_opts
 def dev(
     session: Session,
-    dev_run: RUN_CLI = None,
-    lock: LOCK_CLI = False,
-    update: UPDATE_CLI = False,
-    update_package: UPDATE_PACKAGE_CLI = False,
-    log_session: bool = False,
+    opts: SessionParams,
 ) -> None:
     """Create dev env using conda."""
-    # using conda
 
     (
         Installer.from_envname(
-            session=session, envname="dev", lock=lock, update=update, package="."
+            session=session,
+            envname="dev",
+            lock=opts.lock,
+            update=opts.update,
+            package=".",
         )
         .install_all(
-            update_package=update_package,
-            log_session=log_session,
+            update_package=opts.update_package,
+            log_session=opts.log_session,
             display_name=f"{PACKAGE_NAME}-{session.name}",
         )
-        .run_commands(dev_run)
+        .run_commands(opts.dev_run)
     )
 
 
-dev_venv = group_session(func=dev, name="dev-venv", **DEFAULT_KWS)
-dev = group_session(func=dev, **CONDA_DEFAULT_KWS)
+nox.session(name="dev-venv", **DEFAULT_KWS)(dev)
+nox.session(name="dev", **CONDA_DEFAULT_KWS)(dev)
 
 
 # ** bootstrap
-@NOPYTHON_SESSION
+@nox.session(python=False)
 def bootstrap(session: Session) -> None:
     """Run config, reqs, and dev"""
 
@@ -290,39 +332,37 @@ def bootstrap(session: Session) -> None:
 
 
 # ** config
-@NOPYTHON_SESSION
+@nox.session(python=False)
+@add_opts
 def config(
     session: Session,
-    dev_extras: EXTRAS_CLI = None,
-    python_paths: PYTHON_PATHS_CLI = None,
+    opts: SessionParams,
 ) -> None:
     """Create the file ./config/userconfig.toml"""
-
     args: list[str] = []
-    if dev_extras:
-        args += ["--dev-extras"] + dev_extras
-    if python_paths:
-        args += ["--python-paths"] + python_paths
+    if opts.dev_extras:
+        args += ["--dev-extras"] + opts.dev_extras
+    if opts.python_paths:
+        args += ["--python-paths"] + opts.python_paths
 
     session.run("python", "tools/projectconfig.py", *args)
 
 
 # ** requirements
-@NOPYTHON_SESSION
+@nox.session(python=False)
 def pyproject2conda(
     session: Session,
-    update: UPDATE_CLI = False,
 ) -> None:
     """Alias to reqs"""
+
     session.notify("requirements")
 
 
-@INHERITED_SESSION
+@nox.session
+@add_opts
 def requirements(
     session: Session,
-    update: UPDATE_CLI = False,
-    requirements_force: bool = False,
-    log_session: bool = False,
+    opts: SessionParams,
 ) -> None:
     """
     Create environment.yaml and requirement.txt files from pyproject.toml using pyproject2conda.
@@ -334,39 +374,24 @@ def requirements(
         Installer(
             session=session,
             pip_deps="pyproject2conda>=0.8.0",
-            update=update,
-        ).install_all(log_session=log_session)
+            update=opts.update,
+        ).install_all(log_session=opts.log_session)
     )
 
     session.run(
         "pyproject2conda",
         "project",
         "--verbose",
-        *(["--overwrite", "force"] if requirements_force else []),
+        *(["--overwrite", "force"] if opts.requirements_force else []),
     )
 
 
-# ** conda-lock
-@DEFAULT_SESSION
+# # ** conda-lock
+@nox.session(name="conda-lock", **DEFAULT_KWS)
+@add_opts
 def conda_lock(
     session: Session,
-    update: UPDATE_CLI = False,
-    conda_lock_channel: Annotated[
-        OPT_TYPE, opts_replace(help="conda channels to use")
-    ] = None,
-    conda_lock_platform: Annotated[
-        OPT_TYPE,
-        opts_replace(
-            help="platforms to build lock files for",
-            choices=["osx-64", "linux-64", "win-64", "all"],
-        ),
-    ] = None,
-    conda_lock_include: Annotated[
-        OPT_TYPE, opts_replace(help="lock files to create")
-    ] = None,
-    conda_lock_run: RUN_CLI = None,  # noqa
-    conda_lock_mamba: bool = False,
-    conda_lock_force: bool = False,
+    opts: SessionParams,
 ) -> None:
     """Create lock files using conda-lock."""
 
@@ -374,7 +399,7 @@ def conda_lock(
         Installer(
             session=session,
             pip_deps="conda-lock>=2.2.0",
-            update=update,
+            update=opts.update,
         ).install_all()
     )
 
@@ -382,13 +407,13 @@ def conda_lock(
 
     conda_lock_exclude = ["test-extras"]
 
-    platform = conda_lock_platform
+    platform = opts.conda_lock_platform
     if not platform:
         platform = ["osx-64"]
     elif "all" in platform:
         platform = ["linux-64", "osx-64", "win-64"]
 
-    channel = conda_lock_channel
+    channel = opts.conda_lock_channel
     if not channel:
         channel = ["conda-forge"]
 
@@ -399,8 +424,8 @@ def conda_lock(
 
         # check if skip
         env = "-".join(name.split("-")[1:])
-        if conda_lock_include:
-            if not any(c == env for c in conda_lock_include):  # pyright: ignore
+        if opts.conda_lock_include:
+            if not any(c == env for c in opts.conda_lock_include):  # pyright: ignore
                 session.log(f"Skipping {lockfile} (include)")
                 return
 
@@ -409,14 +434,14 @@ def conda_lock(
                 session.log(f"Skipping {lockfile} (exclude)")
                 return
 
-        if conda_lock_force or update_target(lockfile, *deps):
+        if opts.conda_lock_force or update_target(lockfile, *deps):
             session.log(f"Creating {lockfile}")
             # insert -f for each arg
             if lockfile.exists():
                 lockfile.unlink()
             session.run(
                 "conda-lock",
-                "--mamba" if conda_lock_mamba else "--no-mamba",
+                "--mamba" if opts.conda_lock_mamba else "--no-mamba",
                 *prepend_flag("-c", *channel),
                 *prepend_flag("-p", *platform),
                 *prepend_flag("-f", *deps),
@@ -425,7 +450,7 @@ def conda_lock(
         else:
             session.log(f"Skipping {lockfile} (exists)")
 
-    session_run_commands(session, conda_lock_run)
+    session_run_commands(session, opts.conda_lock_run)
     for path in (ROOT / "requirements").relative_to(ROOT.cwd()).glob("py*.yaml"):
         create_lock(path)
 
@@ -461,60 +486,50 @@ def _test(
         session.run("pytest", *opts)
 
 
+@add_opts
 def test(
     session: Session,
-    test_no_pytest: bool = False,
-    test_opts: TEST_OPTS_CLI = None,
-    test_run: RUN_CLI = None,
-    lock: LOCK_CLI = False,
-    update: UPDATE_CLI = False,
-    update_package: UPDATE_PACKAGE_CLI = False,
-    log_session: bool = False,
-    no_cov: bool = False,
+    opts: SessionParams,
 ) -> None:
     """Test environments with conda installs."""
     (
         Installer.from_envname(
             session=session,
             envname="test",
-            lock=lock,
+            lock=opts.lock,
             package=".",
-            update=update,
-        ).install_all(log_session=log_session, update_package=update_package)
+            update=opts.update,
+        ).install_all(log_session=opts.log_session, update_package=opts.update_package)
     )
 
     _test(
         session=session,
-        run=test_run,
-        test_no_pytest=test_no_pytest,
-        test_opts=test_opts,
-        no_cov=no_cov,
+        run=opts.test_run,
+        test_no_pytest=opts.test_no_pytest,
+        test_opts=opts.test_opts,
+        no_cov=opts.no_cov,
     )
 
 
-test_venv = group_session(test, name="test-venv", **ALL_KWS)
-test = group_session(test, name="test", **CONDA_ALL_KWS)
+nox.session(name="test-venv", **ALL_KWS)(test)
+nox.session(name="test", **CONDA_ALL_KWS)(test)
 
 
 # ** coverage
-@INHERITED_SESSION
+@nox.session
+@add_opts
 def coverage(
     session: Session,
-    coverage_cmd: Annotated[
-        CMD_TYPE, cmd_replace(choices=["erase", "combine", "report", "html", "open"])
-    ] = None,
-    coverage_run: RUN_CLI = None,
-    coverage_run_internal: RUN_CLI = None,
-    update: UPDATE_CLI = False,
+    opts: SessionParams,
 ) -> None:
     runner = Installer(
-        session=session, pip_deps="coverage[toml]", update=update
+        session=session, pip_deps="coverage[toml]", update=opts.update
     ).install_all()
 
-    runner.run_commands(coverage_run)
+    runner.run_commands(opts.coverage_run)
 
-    cmd = coverage_cmd or []
-    if not cmd and not coverage_run and not coverage_run_internal:
+    cmd = opts.coverage_cmd or []
+    if not cmd and not opts.coverage_run and not opts.coverage_run_internal:
         cmd = ["combine", "html", "report"]
 
     session.log(f"{cmd}")
@@ -531,43 +546,37 @@ def coverage(
         else:
             session.run("coverage", c)
 
-    runner.run_commands(coverage_run_internal)
+    runner.run_commands(opts.coverage_run_internal)
 
 
-# ** Docs
+# # ** Docs
+@add_opts
 def docs(
     session: nox.Session,
-    docs_cmd: DOC_CMD_CLI = None,
-    docs_run: RUN_CLI = None,
-    lock: LOCK_CLI = False,
-    update: UPDATE_CLI = False,
-    update_package: UPDATE_PACKAGE_CLI = False,
-    version: VERSION_CLI = "",
-    log_session: bool = False,
+    opts: SessionParams,
 ) -> None:
     """
     Runs make in docs directory. For example, 'nox -s docs -- --docs-cmd
     html' -> 'make -C docs html'. With 'release' option, you can set the
     message with 'message=...' in posargs.
     """
-
     runner = Installer.from_envname(
-        session=session, envname="docs", lock=lock, package=".", update=update
+        session=session, envname="docs", lock=opts.lock, package=".", update=opts.update
     ).install_all(
-        update_package=update_package,
-        log_session=log_session,
-        display_name=f"{PACKAGE_NAME}-docs",
+        update_package=opts.update_package,
+        log_session=opts.log_session,
+        display_name=f"{PACKAGE_NAME}-{session.name}",
     )
 
-    # _docs(session=session, cmd=docs_cmd, run=docs_run, version=version)
+    # _docs(session=session, cmd=opts.docs_cmd, run=opts.docs_run, opts.version=opts.version)
 
-    if version:
-        session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = version
+    if opts.version:
+        session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = opts.version
 
-    runner.run_commands(docs_run)
+    runner.run_commands(opts.docs_run)
 
-    cmd = docs_cmd or []
-    if not docs_run and not cmd:
+    cmd = opts.docs_cmd or []
+    if not opts.docs_run and not cmd:
         cmd = ["html"]
 
     if "symlink" in cmd:
@@ -601,35 +610,31 @@ def docs(
         )
 
 
-docs_venv = group_session(docs, name="docs-venv", **DEFAULT_KWS)
-docs = group_session(docs, name="docs", **CONDA_DEFAULT_KWS)
+nox.session(name="docs-venv", **DEFAULT_KWS)(docs)
+nox.session(name="docs", **CONDA_DEFAULT_KWS)(docs)
 
 
-# ** Dist pypi
-@DEFAULT_SESSION
+# # ** Dist pypi
+@nox.session(name="dist-pypi", **DEFAULT_KWS)
+@add_opts
 def dist_pypi(
     session: nox.Session,
-    dist_pypi_run: RUN_CLI = None,
-    dist_pypi_cmd: DIST_PYPI_CMD_CLI = None,
-    update: UPDATE_CLI = False,
-    version: VERSION_CLI = "",
-    log_session: bool = False,
+    opts: SessionParams,
 ) -> None:
     """Run 'nox -s dist-pypi -- {clean, build, testrelease, release}'."""
-
     runner = Installer.from_envname(
         session=session,
         envname="dist-pypi",
-        update=update,
-    ).install_all(log_session=log_session)
+        update=opts.update,
+    ).install_all(log_session=opts.log_session)
 
-    if version:
-        session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = version
+    if opts.version:
+        session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = opts.version
 
-    runner.run_commands(dist_pypi_run)
+    runner.run_commands(opts.dist_pypi_run)
 
-    cmd = dist_pypi_cmd or []
-    if not dist_pypi_run and not cmd:
+    cmd = opts.dist_pypi_cmd or []
+    if not opts.dist_pypi_run and not cmd:
         cmd = ["build"]
 
     if cmd:
@@ -652,37 +657,19 @@ def dist_pypi(
                 session.run("twine", "upload", "dist/*")
 
 
-# ** Dist conda
-@CONDA_DEFAULT_SESSION
+# # ** Dist conda
+@nox.session(name="dist-conda", **CONDA_DEFAULT_KWS)
+@add_opts
 def dist_conda(
     session: nox.Session,
-    dist_conda_run: RUN_CLI = None,
-    dist_conda_cmd: Annotated[
-        CMD_TYPE,
-        cmd_replace(
-            choices=[
-                "recipe",
-                "build",
-                "clean",
-                "clean-recipe",
-                "clean-build",
-                "recipe-cat-full",
-            ],
-            flags=("--dist-conda-cmd", "-c"),
-        ),
-    ] = None,
-    sdist_path: str = "",
-    update: UPDATE_CLI = False,
-    log_session: bool = False,
-    version: VERSION_CLI = "",
+    opts: SessionParams,
 ) -> None:
     """Runs make -C dist-conda posargs."""
-
     runner = Installer.from_envname(
-        session=session, envname="dist-conda", update=update
-    ).install_all(log_session=log_session)
+        session=session, envname="dist-conda", update=opts.update
+    ).install_all(log_session=opts.log_session)
 
-    run, cmd = dist_conda_run, dist_conda_cmd
+    run, cmd = opts.dist_conda_run, opts.dist_conda_cmd
     runner.run_commands(run)
 
     if not run and not cmd:
@@ -705,10 +692,12 @@ def dist_conda(
             cmd, ["recipe-cat-full", "clean-recipe", "recipe", "clean-build", "build"]
         )
 
-        if not sdist_path:
-            sdist_path = PACKAGE_NAME
-            if version:
-                sdist_path = f"{sdist_path}=={version}"
+        if not opts.dist_conda_sdist_path:
+            opts.dist_conda_sdist_path = PACKAGE_NAME
+            if opts.version:
+                opts.dist_conda_sdist_path = (
+                    f"{opts.dist_conda_sdist_path}=={opts.version}"
+                )
 
         for command in cmd:
             if command == "clean-recipe":
@@ -719,7 +708,7 @@ def dist_conda(
                 session.run(
                     "grayskull",
                     "pypi",
-                    sdist_path,
+                    opts.dist_conda_sdist_path,
                     "--sections",
                     "package",
                     "source",
@@ -741,7 +730,7 @@ def dist_conda(
                     session.run(
                         "grayskull",
                         "pypi",
-                        sdist_path,
+                        opts.dist_conda_sdist_path,
                         "-o",
                         str(d),
                     )
@@ -760,12 +749,11 @@ def dist_conda(
 
 
 # ** lint
-@INHERITED_SESSION
+@nox.session
+@add_opts
 def lint(
     session: nox.Session,
-    lint_run: RUN_CLI = None,
-    update: UPDATE_CLI = False,
-    log_session: bool = False,
+    opts: SessionParams,
 ) -> None:
     """
     Run linters with pre-commit.
@@ -774,57 +762,36 @@ def lint(
     To run something else pass, e.g.,
     `nox -s lint -- --lint-run "pre-commit run --hook-stage manual --all-files`
     """
-
     runner = Installer(
-        session=session, pip_deps="pre-commit", update=update
-    ).install_all(log_session=log_session)
+        session=session, pip_deps="pre-commit", update=opts.update
+    ).install_all(log_session=opts.log_session)
 
-    if lint_run:
-        runner.run_commands(lint_run, external=True)
+    if opts.lint_run:
+        runner.run_commands(opts.lint_run, external=True)
     else:
         session.run("pre-commit", "run", "--all-files")
 
 
 # ** type checking
+@add_opts
 def typing(
     session: nox.Session,
-    typing_cmd: Annotated[
-        CMD_TYPE,
-        cmd_replace(
-            choices=[
-                "clean",
-                "mypy",
-                "pyright",
-                "pytype",
-                "all",
-                "nbqa-mypy",
-                "nbqa-pyright",
-                "nbqa-typing",
-            ],
-            flags=("--typing-cmd", "-m"),
-        ),
-    ] = None,
-    typing_run: RUN_CLI = None,
-    typing_run_internal: RUN_INTERNAL_CLI = None,
-    lock: LOCK_CLI = False,
-    update: UPDATE_CLI = False,
-    log_session: bool = False,
+    opts: SessionParams,
 ) -> None:
     """Run type checkers (mypy, pyright, pytype)."""
-
     runner = (
         Installer.from_envname(
             session=session,
             envname="typing",
-            lock=lock,
-            update=update,
+            lock=opts.lock,
+            update=opts.update,
         )
-        .install_all(log_session=log_session)
-        .run_commands(typing_run)
+        .install_all(log_session=opts.log_session)
+        .run_commands(opts.typing_run)
     )
 
-    cmd = typing_cmd or []
-    if not typing_run and not typing_run_internal and not cmd:
+    cmd = opts.typing_cmd or []
+    if not opts.typing_run and not opts.typing_run_internal and not cmd:
         cmd = ["mypy", "pyright"]
 
     if "all" in cmd:
@@ -860,28 +827,24 @@ def typing(
         else:
             session.log(f"skipping unknown command {c}")
 
-    runner.run_commands(typing_run_internal, external=False)
+    runner.run_commands(opts.typing_run_internal, external=False)
 
 
-typing_venv = group_session(typing, name="typing-venv", **ALL_KWS)
-typing = group_session(typing, name="typing", **CONDA_ALL_KWS)
+nox.session(name="typing-venv", **ALL_KWS)(typing)
+nox.session(name="typing", **CONDA_ALL_KWS)(typing)
 
 
 # ** testdist (conda)
-def _testdist(
+def testdist(
     session: Session,
-    test_no_pytest: bool = False,
-    test_opts: TEST_OPTS_CLI = None,
-    testdist_run: RUN_CLI = None,
-    update: UPDATE_CLI = False,
-    version: VERSION_CLI = "",
-    log_session: bool = False,
 ) -> None:
     """Test conda distribution."""
 
+    opts = parse_posargs(*session.posargs)
+
     install_str = PACKAGE_NAME
-    if version:
-        install_str = f"{install_str}=={version}"
+    if opts.version:
+        install_str = f"{install_str}=={opts.version}"
 
     if is_conda_session(session):
         pip_deps, conda_deps = None, install_str
@@ -894,25 +857,25 @@ def _testdist(
             envname="test-extras",
             conda_deps=conda_deps,
             pip_deps=pip_deps,
-            update=update,
+            update=opts.update,
             channels="conda-forge",
-        ).install_all(log_session=log_session)
+        ).install_all(log_session=opts.log_session)
     )
 
     _test(
         session=session,
-        run=testdist_run,
-        test_no_pytest=test_no_pytest,
-        test_opts=test_opts,
+        run=opts.testdist_run,
+        test_no_pytest=opts.test_no_pytest,
+        test_opts=opts.test_opts,
         no_cov=True,
     )
 
 
-testdist_pypi = group_session(_testdist, name="testdist-pypi", **ALL_KWS)
-testdist_conda = group_session(_testdist, name="testdist-conda", **CONDA_ALL_KWS)
+nox.session(name="testdist-pypi", **ALL_KWS)(testdist)
+nox.session(name="testdist-conda", **CONDA_ALL_KWS)(testdist)
 
 
-# * Utilities --------------------------------------------------------------------------
+# * Utilities -------------------------------------------------------------------------
 def _create_doc_examples_symlinks(session: nox.Session, clean: bool = True) -> None:
     """Create symlinks from docs/examples/*.md files to /examples/usage/..."""
 
@@ -983,7 +946,7 @@ def _append_recipe(recipe_path: str, append_path: str) -> None:
 # # If want separate env for updating/reporting version with setuptools-scm
 # # We do this from dev environment.
 # # ** version report/update
-# @DEFAULT_SESSION
+# @nox.session(**DEFAULT_KWS)
 # def version_scm(
 #     session: Session,
 #     version: VERSION_CLI = "",
@@ -1002,7 +965,7 @@ def _append_recipe(recipe_path: str, append_path: str) -> None:
 #         name="version-scm",
 #         install_package=True,
 #         reqs=["setuptools_scm"],
-#         update=update,
+#         update=opts.update,
 #         no_deps=True,
 #     )
 
