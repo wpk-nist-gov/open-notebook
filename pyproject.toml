@@ -45,7 +45,6 @@ test = [
 dev-extras = [
     "setuptools-scm>=8.0", #
     "pytest-accept", # p2c: -p
-    # "nbval",
     "ipython",
     "ipykernel",
 ]
@@ -57,11 +56,7 @@ typing = [
     "open-notebook[typing-extras]", #
 
 ]
-nox = [
-    "nox",
-    "noxopt", # p2c: -p
-    "ruamel.yaml",
-]
+nox = ["nox", "ruamel.yaml"]
 dev = [
     "open-notebook[test]", #
     "open-notebook[typing-extras]",
@@ -69,7 +64,6 @@ dev = [
 ]
 tools = [
     "pre-commit", #
-    # "cruft",
     "scriv", # p2c: -p
     "nbqa",
     "pyright",
@@ -93,15 +87,6 @@ docs = [
     "autodocsumm",
     "sphinx-argparse",
 ]
-# to be parsed with pyproject2conda with --no-base option
-dist-pypi = ["twine", "build"]
-dist-conda = [
-    "anaconda-client", #
-    "grayskull",
-    "conda-build",
-    "conda-verify",
-    "boa",
-]
 
 [tool.pyproject2conda]
 user_config = "config/userconfig.toml"
@@ -111,33 +96,24 @@ template = "requirements/{env}"
 python = ["3.11"]
 channels = ["conda-forge"]
 style = ["yaml", "requirements"]
-default_envs = [
-    "test",
-    "typing",
-    "docs",
-    "dev",
-    "dev-complete",
-    "dist-conda",
-    "dist-pypi"
-]
+default_envs = ["test", "typing", "docs", "dev", "dev-complete"]
 
 [tool.pyproject2conda.envs.test-extras]
 extras = ["test"]
+base = false
 
 [tool.pyproject2conda.envs.dev-base]
 extras = ["dev"]
 
-[[tool.pyproject2conda.overrides]]
-envs = ["test-extras", "dist-conda", "dist-pypi"]
+[tool.pyproject2conda.envs.build]
+extras = false
+reqs = ["build"]
 base = false
+style = "requirements"
 
 [[tool.pyproject2conda.overrides]]
 envs = ["test", "typing", "test-extras"]
 python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
-
-[[tool.pyproject2conda.overrides]]
-envs = ["dist-conda"]
-style = ["yaml"]
 
 [project.scripts]
 open-notebook = "open_notebook.cli:main"

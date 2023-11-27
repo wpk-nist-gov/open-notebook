@@ -7,7 +7,7 @@
 # You should not manually edit this file.
 # Instead edit the corresponding pyproject.toml file.
 #
-mypy >= 1.4.1
-pytype; python_version < '3.11'
+mypy>=1.4.1
+pytype;python_version<"3.11"
 tomli
 typing-extensions

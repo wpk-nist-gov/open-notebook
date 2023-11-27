@@ -13,7 +13,7 @@ dependencies:
   - python=3.11
   - ipykernel
   - ipython
-  - mypy >= 1.4.1
+  - mypy>=1.4.1
   - pytest
   - pytest-cov
   - pytest-sugar

@@ -2,17 +2,19 @@
 Light weight argparser from a dataclass.
 
 There are some libraries out there that mostly do what we want, but none are quite right.
-"""
 
+
+Took motivation from the following:
+https://github.com/typed-argparse/typed-argparse
+https://github.com/SunDoge/typed-args
+"""
 from __future__ import annotations
 
 import sys
 from argparse import ArgumentParser
 from dataclasses import (
-    MISSING as dataclass_MISSING,
-)
-from dataclasses import (
     dataclass,
+    field,
     fields,
     is_dataclass,
     replace,
@@ -26,7 +28,7 @@ assert sys.version_info >= (3, 10)
 # else:
 #     from typing import Annotated, get_args, get_origin, get_type_hints
 
-from typing import Annotated, get_args, get_origin, get_type_hints
+from typing import get_args, get_origin, get_type_hints
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -37,8 +39,79 @@ else:
 _NoneType = type(None)
 
 UNDEFINED = cast(
-    Any, type("Undefined", (), {"__repr__": lambda self: "UNDEFINED"})()
-)  # pyright: ignore
+    Any,
+    type("Undefined", (), {"__repr__": lambda self: "UNDEFINED"})(),  # pyright: ignore
+)
+
+
+def argument(
+    *flags: str,
+    default: Any = None,
+    action: str | None = UNDEFINED,
+    choices: Container[Any] = UNDEFINED,
+    const: Any = UNDEFINED,
+    dest: str = UNDEFINED,
+    help: str = UNDEFINED,
+    metavar: str = UNDEFINED,
+    nargs: str | int | None = UNDEFINED,
+    required: bool = UNDEFINED,
+    type: int | float | Callable[[Any], Any] = UNDEFINED,
+    **field_kws: Any,
+) -> Any:
+    return field(
+        metadata={
+            "parser": {
+                "flags": flags,
+                "action": action,
+                "choices": choices,
+                "const": const,
+                "default": default,
+                "dest": dest,
+                "help": help,
+                "metavar": metavar,
+                "nargs": nargs,
+                "required": required,
+                "type": type,
+            }
+        },
+        default=default,
+    )
+
+
+class DataclassParser:
+    """Mixin for creating a dataclass with parsing."""
+
+    @classmethod
+    def parser(cls, prefix_char: str = "-", **kwargs: Any) -> ArgumentParser:
+        parser = ArgumentParser(prefix_chars=prefix_char, **kwargs)
+
+        for _, opt in get_dataclass_options(cls).items():
+            opt.add_argument_to_parser(parser, prefix_char=prefix_char)
+
+        return parser
+
+    @classmethod
+    def from_posargs(
+        cls,
+        posargs: str | Sequence[str],
+        prefix_char: str = "-",
+        parser: ArgumentParser | None = None,
+        known: bool = False,
+    ) -> Self:
+        if parser is None:
+            parser = cls.parser(prefix_char=prefix_char)
+
+        if isinstance(posargs, str):
+            import shlex
+
+            posargs = shlex.split(posargs)
+
+        if known:
+            parsed, _ = parser.parse_known_args(posargs)
+        else:
+            parsed = parser.parse_args(posargs)
+
+        return cls(**vars(parsed))
 
 
 @dataclass
@@ -104,54 +177,87 @@ class Option:
         parser.add_argument(*flags, **kwargs)
 
 
-def _is_union_type(t: Any) -> bool:
-    # types.UnionType only exists in Python 3.10+.
-    # https://docs.python.org/3/library/stdtypes.html#types-union
-    if sys.version_info >= (3, 10):
-        import types
+def get_dataclass_options(cls: Any) -> dict[str, Option]:
+    options: dict[str, Option] = {}
 
-        origin = get_origin(t)
-        return origin is types.UnionType or origin is Union
+    for name, (metadata, annotation) in _get_dataclass_metadata_and_annotations(
+        cls
+    ).items():
+        opt = _create_option(name=name, metadata=metadata, annotation=annotation)
+        if opt is not None:
+            options[name] = opt
+
+    return options
+
+
+def _get_dataclass_metadata_and_annotations(
+    cls: Any,
+) -> dict[str, tuple[dict[str, Any], Any]]:
+    annotations = get_type_hints(cls, include_extras=True)
+
+    assert is_dataclass(cls)
+    cls_fields = fields(cls)
+
+    out: dict[str, tuple[Any, Any]] = {}
+    for f in cls_fields:
+        if f.name.startswith("_") or not f.init:
+            continue
+        else:
+            out[f.name] = (
+                f.metadata.get("parser", {}),
+                annotations[f.name],
+            )
+    return out
+
+
+def _create_option(
+    name: str,
+    metadata: dict[str, Any],
+    annotation: Any,
+) -> Option | None:
+    opt = Option(**metadata)
+
+    depth, underlying_type = _get_underlying_type(annotation)
+
+    if depth <= 2 and get_origin(underlying_type) is Literal:
+        choices = get_args(underlying_type)
+        if opt.choices is UNDEFINED:
+            opt = replace(opt, choices=choices)
     else:
-        return False
+        choices = None
 
+    if opt.nargs is UNDEFINED and depth > 0:
+        opt = replace(opt, nargs="*")
 
-def _get_underlying_if_optional(t: Any, pass_through: bool = False) -> Any:
-    if _is_union_type(t):
-        args = get_args(t)
-        if len(args) == 2 and _NoneType in args:
-            for t in args:
-                if t != _NoneType:
-                    return t
-    elif pass_through:
-        return t
+    if opt.action is UNDEFINED and depth > 1:
+        opt = replace(opt, action="append")
 
-    return None
+    if opt.type is UNDEFINED:
+        if choices:
+            opt_type = type(choices[0])
 
+        else:
+            opt_type = underlying_type
 
-def _get_choices(
-    opt: Any, allow_optional: bool = True, allow_list: bool = True
-) -> list[Any] | None:
-    """Parse a type annotation for Literal[...], list[Literal[...]], or list[Literal[...]] | None"""
-    out: list[Any] = []
+        if not callable(opt_type):
+            raise TypeError(
+                f"Annotation {annotation} for parameter {name!r} is not callable."
+                f"Declare arg type with Annotated[..., Option(type=...)] instead."
+            )
+        opt = replace(opt, type=opt_type)
 
-    if (opt_origin := get_origin(opt)) is None:
-        pass
-    elif opt_origin is Literal:
-        out.extend(get_args(opt))
-    elif allow_list and opt_origin is list:
-        opt_arg, *extras = get_args(opt)
-        if not extras and (
-            new_out := _get_choices(opt_arg, allow_optional=False, allow_list=False)
-        ):
-            out.extend(new_out)
-    elif allow_optional and (underlying := _get_underlying_if_optional(opt)):
-        if new_out := _get_choices(
-            underlying, allow_optional=False, allow_list=allow_list
-        ):
-            out.extend(new_out)
+    if opt.type is bool:
+        opt = replace(
+            opt,
+            action="store_false" if opt.default is True else "store_true",
+            type=UNDEFINED,
+            default=UNDEFINED,
+        )
 
-    return out or None
+    if opt.flags is UNDEFINED or not opt.flags:
+        opt = replace(opt, flags="--" + name.replace("_", "-"))
+
+    return opt
 
 
 def _get_underlying_type(
@@ -184,146 +290,26 @@ def _get_underlying_type(
     return depth_out, type_
 
 
-def _create_option(
-    name: str, default: Any, annotation: Any, explicit_options: bool
-) -> Option | None:
-    if get_origin(annotation) is Annotated:
-        anno_args = get_args(annotation)
-    elif explicit_options:
-        return None
+def _get_underlying_if_optional(t: Any, pass_through: bool = False) -> Any:
+    if _is_union_type(t):
+        args = get_args(t)
+        if len(args) == 2 and _NoneType in args:
+            for t in args:
+                if t != _NoneType:
+                    return t
+    elif pass_through:
+        return t
+
+    return None
+
+
+def _is_union_type(t: Any) -> bool:
+    # types.UnionType only exists in Python 3.10+.
+    # https://docs.python.org/3/library/stdtypes.html#types-union
+    if sys.version_info >= (3, 10):
+        import types
+
+        origin = get_origin(t)
+        return origin is types.UnionType or origin is Union
     else:
-        anno_args = (annotation, Option())
-
-    opt: Option | None
-    opt_type, opt, *extra_args = anno_args
-
-    if extra_args:
-        raise ValueError(f"{annotation} has extra metadata {extra_args}")
-
-    if opt is None:
-        return None
-
-    # # Just just underlying type
-    # if opt.choices is UNDEFINED:
-    #     if (choices := _get_choices(opt_type)):
-    #         opt = replace(opt, choices=choices)
-    # else:
-    #     choices = None
-
-    depth, underlying_type = _get_underlying_type(opt_type)
-
-    if depth <= 2 and get_origin(underlying_type) is Literal:
-        choices = get_args(underlying_type)
-        if opt.choices is UNDEFINED:
-            opt = replace(opt, choices=choices)
-    else:
-        choices = None
-
-    if opt.nargs is UNDEFINED and depth > 0:
-        opt = replace(opt, nargs="*")
-
-    if opt.action is UNDEFINED and depth > 1:
-        opt = replace(opt, action="append")
-
-    if opt.type is UNDEFINED:
-        if choices:
-            opt_type = type(choices[0])
-
-        elif depth > 0:
-            opt_type = underlying_type
-
-        if not callable(opt_type):
-            raise TypeError(
-                f"Annotation {annotation} for parameter {name!r} is not callable."
-                f"Declare option type with Annotated[..., Option(type=...)] instead."
-            )
-        opt = replace(opt, type=opt_type)
-
-    if opt.type is bool:
-        opt = replace(
-            opt,
-            action="store_false" if default is True else "store_true",
-            type=UNDEFINED,
-            default=UNDEFINED,
-        )
-    elif default is not UNDEFINED:
-        opt = replace(opt, default=default)
-    else:
-        opt = replace(opt, required=True)
-
-    # origin = get_origin(opt)
-    # if origin is list:
-    #     # if list type, then set nargs to "*"
-    #     if opt.nargs is UNDEFINED:
-    #         opt = replace(opt, nargs="*")
-
-    #     # if list[Literal], set choices
-
-    if opt.flags is UNDEFINED:
-        opt = replace(opt, flags="--" + name.replace("_", "-"))
-    return opt
-
-
-def get_dataclass_options(cls: Any) -> dict[str, Option]:
-    options: dict[str, Option] = {}
-
-    for k, (d, a) in _get_dataclass_defaults_and_annotations(cls).items():
-        opt = _create_option(k, d, a, False)
-        if opt is not None:
-            options[k] = opt
-
-    return options
-
-
-def _get_dataclass_defaults_and_annotations(cls: Any) -> dict[str, tuple[Any, Any]]:
-    annotations = get_type_hints(cls, include_extras=True)
-
-    assert is_dataclass(cls)
-    cls_fields = fields(cls)
-
-    out: dict[str, tuple[Any, Any]] = {}
-    for f in cls_fields:
-        if f.name.startswith("_") or not f.init:
-            continue
-        else:
-            out[f.name] = (
-                UNDEFINED if f.default is dataclass_MISSING else f.default,
-                annotations[f.name],
-            )
-    return out
-
-
-class DataClassParserMixin:
-    """Mixin for creating a dataclass with parsing."""
-
-    @classmethod
-    def parser(cls, prefix_char: str = "-", **kwargs: Any) -> ArgumentParser:
-        parser = ArgumentParser(prefix_chars=prefix_char, **kwargs)
-
-        for _, opt in get_dataclass_options(cls).items():
-            opt.add_argument_to_parser(parser, prefix_char=prefix_char)
-
-        return parser
-
-    @classmethod
-    def from_posargs(
-        cls,
-        posargs: str | Sequence[str],
-        prefix_char: str = "-",
-        parser: ArgumentParser | None = None,
-        known: bool = False,
-    ) -> Self:
-        if parser is None:
-            parser = cls.parser(prefix_char=prefix_char)
-
-        if isinstance(posargs, str):
-            import shlex
-
-            posargs = shlex.split(posargs)
-
-        if known:
-            parsed, _ = parser.parse_known_args(posargs)
-        else:
-            parsed = parser.parse_args(posargs)
-
-        return cls(**vars(parsed))
+        return False

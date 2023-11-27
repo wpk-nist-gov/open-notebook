@@ -9,26 +9,19 @@ from functools import lru_cache, wraps
 # Should only use on python version > 3.10
 assert sys.version_info >= (3, 10)
 
-from dataclasses import replace  # noqa
 from pathlib import Path
 from typing import (
-    Any,
+    Callable,
     Iterator,
+    Literal,
     Sequence,
     TypedDict,
-    Callable,
 )
 
 if sys.version_info > (3, 10):
     from typing import TypeAlias
 else:
-    from typing_extensions import TypeAlias
-
-if sys.version_info > (3, 9):
-    from typing import Annotated
-else:
-    from typing_extensions import Annotated
-
+    from typing_extensions import TypeAlias  # noqa
 
 from dataclasses import dataclass
 
@@ -38,7 +31,7 @@ from nox import Session
 # fmt: off
 sys.path.insert(0, ".")
 
-from tools.dataclass_parser import DataClassParserMixin, Option
+from tools.dataclass_parser import DataclassParser, argument
 from tools.noxtools import (
     Installer,
     combine_list_str,
@@ -47,7 +40,6 @@ from tools.noxtools import (
     open_webpage,
     prepend_flag,
     session_run_commands,
-    sort_like,
     update_target,
 )
 
@@ -113,166 +105,108 @@ ALL_KWS: SessionOptionsDict = {"python": PYTHON_ALL_VERSIONS}
 # * Session command line options -------------------------------------------------------
 
 OPT_TYPE: TypeAlias = list[str] | None
-CMD_TYPE: TypeAlias = list[str] | None
 RUN_TYPE: TypeAlias = list[list[str]] | None
-
-RUN_OPTION = Option(
-    nargs="*",
-    type=str,
-    action="append",
-    help="Run passed command_demo using `external=True`",
-)
-
-CMD_OPTION = Option(nargs="*", type=str, help="cmd to be run")
-OPT_OPTION = Option(nargs="*", type=str, help="options")
-
-
-def opt_replace(**kwargs: Any) -> Option:
-    return replace(OPT_OPTION, **kwargs)
-
-
-def cmd_replace(**kwargs: Any) -> Option:
-    return replace(CMD_OPTION, **kwargs)
-
-
-def run_replace(**kwargs: Any) -> Option:
-    return replace(RUN_OPTION, **kwargs)
-
-
-RUN_ANNOTATED = Annotated[RUN_TYPE, RUN_OPTION]
-CMD_ANNOTATED = Annotated[CMD_TYPE, CMD_OPTION]
-OPT_ANNOTATED = Annotated[OPT_TYPE, OPT_OPTION]
-
-RUN_INTERNAL_ANNOTATED = Annotated[RUN_TYPE, run_replace(help="Run internal commands")]
 
 
 @dataclass
-class SessionParams(DataClassParserMixin):
-    """Data class for handling options to session"""
+class SessionParams(DataclassParser):
+    """Holds all cli options"""
 
     # common parameters
     lock: bool = False
-    update: Annotated[
-        bool, Option(flags=("--update", "-U"), help="update dependencies")
-    ] = False
-    update_package: Annotated[bool, Option(flags=("--update-package", "-P"))] = False
-    log_session: Annotated[bool, Option(flags=("--log-session", "-L"))] = False
-    version: Annotated[str | None, Option(type=str)] = None
+    update: bool = argument("--update", "-U", help="update dependencies/package")
+    update_package: bool = argument(
+        "--update-package", "-P", help="update package only"
+    )
+    log_session: bool = argument("--log-session", "-L")
+    version: str | None = None
 
     # dev
-    dev_run: RUN_ANNOTATED = None
+    dev_run: RUN_TYPE = argument(help="Run external in dev env")
 
     # config
-    dev_extras: OPT_ANNOTATED = None
-    python_paths: OPT_ANNOTATED = None
+    dev_extras: OPT_TYPE = argument(help="`extras` to include in dev environment")
+    python_paths: OPT_TYPE = argument(help="paths to python executables")
 
     # requirements
     requirements_force: bool = False
 
     # conda-lock
-    conda_lock_channel: Annotated[OPT_TYPE, opt_replace(help="conda channels")] = None
-    conda_lock_platform: Annotated[
-        OPT_TYPE,
-        opt_replace(
-            help="platforms to build lock files for",
-            choices=["osx-64", "linux-64", "win-64", "all"],
-        ),
-    ] = None
-    conda_lock_include: Annotated[
-        OPT_TYPE, opt_replace(help="lock files to create")
-    ] = None
-    conda_lock_run: RUN_ANNOTATED = None
+    conda_lock_channel: OPT_TYPE = argument(help="conda channels")
+    conda_lock_platform: list[
+        Literal["osx-64", "linux-64", "win-64", "all"]
+    ] | None = None
+    conda_lock_include: OPT_TYPE = argument(help="lock files to create")
+    conda_lock_run: RUN_TYPE = argument(help="run internal")
     conda_lock_mamba: bool = False
     conda_lock_force: bool = False
 
     # test
     test_no_pytest: bool = False
-    test_opts: Annotated[OPT_TYPE, opt_replace(help="options to pytest")] = None
-    test_run: RUN_ANNOTATED = None
+    test_opts: OPT_TYPE = argument(help="options to pytest")
+    test_run: RUN_TYPE = None
     no_cov: bool = False
 
     # coverage
-    coverage_cmd: Annotated[
-        CMD_TYPE, cmd_replace(choices=["erase", "combine", "report", "html", "open"])
-    ] = None
-    coverage_run: RUN_ANNOTATED = None
-    coverage_run_internal: RUN_ANNOTATED = None
-
-    # docs
-    docs_cmd: Annotated[
-        CMD_TYPE,
-        cmd_replace(
-            choices=[
-                "html",
-                "build",
-                "symlink",
-                "clean",
-                "livehtml",
-                "linkcheck",
-                "spelling",
-                "showlinks",
-                "release",
-                "open",
-                "serve",
-            ],
-            flags=("--docs-cmd", "-d"),
-        ),
-    ] = None
-    docs_run: RUN_ANNOTATED = None
-
-    # dist-pypi
-    dist_pypi_run: RUN_ANNOTATED = None
-    dist_pypi_cmd: Annotated[
-        CMD_TYPE,
-        cmd_replace(
-            choices=["clean", "build", "testrelease", "release"],
-            flags=("-p", "--dist-pypi-cmd"),
-        ),
-    ] = None
-
-    # dist-conda
-    dist_conda_run: RUN_ANNOTATED = None
-    dist_conda_cmd: Annotated[
-        CMD_TYPE,
-        cmd_replace(
-            choices=[
-                "recipe",
-                "build",
-                "clean",
-                "clean-recipe",
-                "clean-build",
-                "recipe-cat-full",
-            ],
-            flags=("--dist-conda-cmd", "-c"),
-        ),
-    ] = None
-    dist_conda_sdist_path: Annotated[str | None, Option(type=str)] = None
-
-    # lint (pre-commit)
-    lint_run: RUN_ANNOTATED = None
-
-    # typing
-    typing_cmd: Annotated[
-        CMD_TYPE,
-        cmd_replace(
-            choices=[
-                "clean",
-                "mypy",
-                "pyright",
-                "pytype",
-                "all",
-                "nbqa-mypy",
-                "nbqa-pyright",
-                "nbqa-typing",
-            ],
-            flags=("--typing-cmd", "-m"),
-        ),
-    ] = None
-    typing_run: RUN_ANNOTATED = None
-    typing_run_internal: RUN_INTERNAL_ANNOTATED = None
+    coverage: list[Literal["erase", "combine", "report", "html", "open"]] | None = None
+    coverage_run: RUN_TYPE = None
+    coverage_run_internal: RUN_TYPE = None
 
     # testdist
-    testdist_run: RUN_ANNOTATED = None
+    testdist_run: RUN_TYPE = None
+
+    # docs
+    docs: list[
+        Literal[
+            "html",
+            "build",
+            "symlink",
+            "clean",
+            "livehtml",
+            "linkcheck",
+            "spelling",
+            "showlinks",
+            "release",
+            "open",
+            "serve",
+        ]
+    ] | None = argument("--docs", "-d")
+    docs_run: RUN_TYPE = None
+
+    # lint (pre-commit)
+    lint_run: RUN_TYPE = None
+
+    # typing
+    typing: list[
+        Literal[
+            "clean",
+            "mypy",
+            "pyright",
+            "pytype",
+            "all",
+            "nbqa-mypy",
+            "nbqa-pyright",
+            "nbqa-typing",
+        ]
+    ] = argument("--typing", "-m")
+    typing_run: RUN_TYPE = None
+    typing_run_internal: RUN_TYPE = None
+
+    # build
+    build_run: RUN_TYPE = None
+
+    # publish
+    publish: list[Literal["release", "test"]] | None = argument("-p", "--publish")
+    publish_run: RUN_TYPE = None
+
+    # conda-recipe/grayskull
+    conda_recipe: list[Literal["recipe", "recipe-full"]] | None = None
+    conda_recipe_run: RUN_TYPE = None
+    conda_recipe_sdist_path: str | None = None
+
+    # conda-build
+    conda_build: list[Literal["build", "clean"]] | None = None
+    conda_build_run: RUN_TYPE = None
 
 
 @lru_cache
@@ -486,6 +420,7 @@ def _test(
         session.run("pytest", *opts)
 
 
+# *** Basic tests
 @add_opts
 def test(
     session: Session,
@@ -515,7 +450,7 @@ nox.session(name="test-venv", **ALL_KWS)(test)
 nox.session(name="test", **CONDA_ALL_KWS)(test)
 
 
-# ** coverage
+# *** coverage
 @nox.session
 @add_opts
 def coverage(
@@ -528,7 +463,7 @@ def coverage(
 
     runner.run_commands(opts.coverage_run)
 
-    cmd = opts.coverage_cmd or []
+    cmd = opts.coverage or []
     if not cmd and not opts.coverage_run and not opts.coverage_run_internal:
         cmd = ["combine", "html", "report"]
 
@@ -547,6 +482,47 @@ def coverage(
             session.run("coverage", c)
 
     runner.run_commands(opts.coverage_run_internal)
+
+
+# *** testdist (conda)
+def testdist(
+    session: Session,
+) -> None:
+    """Test conda distribution."""
+
+    opts = parse_posargs(*session.posargs)
+
+    install_str = PACKAGE_NAME
+    if opts.version:
+        install_str = f"{install_str}=={opts.version}"
+
+    if is_conda_session(session):
+        pip_deps, conda_deps = None, install_str
+    else:
+        pip_deps, conda_deps = install_str, None
+
+    (
+        Installer.from_envname(
+            session=session,
+            envname="test-extras",
+            conda_deps=conda_deps,
+            pip_deps=pip_deps,
+            update=opts.update,
+            channels="conda-forge",
+        ).install_all(log_session=opts.log_session)
+    )
+
+    _test(
+        session=session,
+        run=opts.testdist_run,
+        test_no_pytest=opts.test_no_pytest,
+        test_opts=opts.test_opts,
+        no_cov=True,
+    )
+
+
+nox.session(name="testdist-pypi", **ALL_KWS)(testdist)
+nox.session(name="testdist-conda", **CONDA_ALL_KWS)(testdist)
 
 
 # # ** Docs
@@ -568,14 +544,14 @@ def docs(
         display_name=f"{PACKAGE_NAME}-{session.name}",
     )
 
-    # _docs(session=session, cmd=opts.docs_cmd, run=opts.docs_run, opts.version=opts.version)
+    # _docs(session=session, cmd=opts.docs, run=opts.docs_run, opts.version=opts.version)
 
     if opts.version:
         session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = opts.version
 
     runner.run_commands(opts.docs_run)
 
-    cmd = opts.docs_cmd or []
+    cmd = opts.docs or []
     if not opts.docs_run and not cmd:
         cmd = ["html"]
 
@@ -612,140 +588,6 @@ def docs(
 
 nox.session(name="docs-venv", **DEFAULT_KWS)(docs)
 nox.session(name="docs", **CONDA_DEFAULT_KWS)(docs)
-
-
-# # ** Dist pypi
-@nox.session(name="dist-pypi", **DEFAULT_KWS)
-@add_opts
-def dist_pypi(
-    session: nox.Session,
-    opts: SessionParams,
-) -> None:
-    """Run 'nox -s dist-pypi -- {clean, build, testrelease, release}'."""
-    runner = Installer.from_envname(
-        session=session,
-        envname="dist-pypi",
-        update=opts.update,
-    ).install_all(log_session=opts.log_session)
-
-    if opts.version:
-        session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = opts.version
-
-    runner.run_commands(opts.dist_pypi_run)
-
-    cmd = opts.dist_pypi_cmd or []
-    if not opts.dist_pypi_run and not cmd:
-        cmd = ["build"]
-
-    if cmd:
-        if "build" in cmd:
-            cmd.append("clean")
-        cmd = sort_like(cmd, ["clean", "build", "testrelease", "release"])
-
-        session.log(f"cmd={cmd}")
-
-        for command in cmd:
-            if command == "clean":
-                session.run("rm", "-rf", "dist", external=True)
-            elif command == "build":
-                session.run("python", "-m", "build", "--outdir", "dist/")
-
-            elif command == "testrelease":
-                session.run("twine", "upload", "--repository", "testpypi", "dist/*")
-
-            elif command == "release":
-                session.run("twine", "upload", "dist/*")
-
-
-# # ** Dist conda
-@nox.session(name="dist-conda", **CONDA_DEFAULT_KWS)
-@add_opts
-def dist_conda(
-    session: nox.Session,
-    opts: SessionParams,
-) -> None:
-    """Runs make -C dist-conda posargs."""
-    runner = Installer.from_envname(
-        session=session, envname="dist-conda", update=opts.update
-    ).install_all(log_session=opts.log_session)
-
-    run, cmd = opts.dist_conda_run, opts.dist_conda_cmd
-    runner.run_commands(run)
-
-    if not run and not cmd:
-        cmd = ["recipe"]
-
-    # make directory?
-    if not (d := Path("./dist-conda")).exists():
-        d.mkdir()
-
-    if cmd:
-        if "recipe" in cmd:
-            cmd.append("clean-recipe")
-        if "build" in cmd:
-            cmd.append("clean-build")
-        if "clean" in cmd:
-            cmd.extend(["clean-recipe", "clean-build"])
-            cmd.remove("clean")
-
-        cmd = sort_like(
-            cmd, ["recipe-cat-full", "clean-recipe", "recipe", "clean-build", "build"]
-        )
-
-        if not opts.dist_conda_sdist_path:
-            opts.dist_conda_sdist_path = PACKAGE_NAME
-            if opts.version:
-                opts.dist_conda_sdist_path = (
-                    f"{opts.dist_conda_sdist_path}=={opts.version}"
-                )
-
-        for command in cmd:
-            if command == "clean-recipe":
-                session.run("rm", "-rf", f"dist-conda/{PACKAGE_NAME}", external=True)
-            elif command == "clean-build":
-                session.run("rm", "-rf", "dist-conda/build", external=True)
-            elif command == "recipe":
-                session.run(
-                    "grayskull",
-                    "pypi",
-                    opts.dist_conda_sdist_path,
-                    "--sections",
-                    "package",
-                    "source",
-                    "build",
-                    "requirements",
-                    "-o",
-                    "dist-conda",
-                )
-                _append_recipe(
-                    f"dist-conda/{PACKAGE_NAME}/meta.yaml", "config/recipe-append.yaml"
-                )
-                session.run(
-                    "cat", f"dist-conda/{PACKAGE_NAME}/meta.yaml", external=True
-                )
-            elif command == "recipe-cat-full":
-                import tempfile
-
-                with tempfile.TemporaryDirectory() as d:  # type: ignore[assignment,unused-ignore]
-                    session.run(
-                        "grayskull",
-                        "pypi",
-                        opts.dist_conda_sdist_path,
-                        "-o",
-                        str(d),
-                    )
-                    session.run(
-                        "cat", str(Path(d) / PACKAGE_NAME / "meta.yaml"), external=True
-                    )
-
-            elif command == "build":
-                session.run(
-                    "conda",
-                    "mambabuild",
-                    "--output-folder=dist-conda/build",
-                    "--no-anaconda-upload",
-                    "dist-conda",
-                )
 
 
 # ** lint
@@ -790,7 +632,7 @@ def typing(
         .run_commands(opts.typing_run)
     )
 
-    cmd = opts.typing_cmd or []
+    cmd = opts.typing or []
     if not opts.typing_run and not opts.typing_run_internal and not cmd:
         cmd = ["mypy", "pyright"]
 
@@ -834,45 +676,147 @@ nox.session(name="typing-venv", **ALL_KWS)(typing)
 nox.session(name="typing", **CONDA_ALL_KWS)(typing)
 
 
-# ** testdist (conda)
-def testdist(
-    session: Session,
-) -> None:
-    """Test conda distribution."""
-
-    opts = parse_posargs(*session.posargs)
-
-    install_str = PACKAGE_NAME
-    if opts.version:
-        install_str = f"{install_str}=={opts.version}"
-
-    if is_conda_session(session):
-        pip_deps, conda_deps = None, install_str
-    else:
-        pip_deps, conda_deps = install_str, None
-
+# # ** Dist pypi
+@nox.session
+@add_opts
+def build(session: nox.Session, opts: SessionParams) -> None:
+    """Build the distribution"""
     (
         Installer.from_envname(
             session=session,
-            envname="test-extras",
-            conda_deps=conda_deps,
-            pip_deps=pip_deps,
+            envname="build",
             update=opts.update,
-            channels="conda-forge",
         ).install_all(log_session=opts.log_session)
     )
 
-    _test(
-        session=session,
-        run=opts.testdist_run,
-        test_no_pytest=opts.test_no_pytest,
-        test_opts=opts.test_opts,
-        no_cov=True,
+    if opts.version:
+        session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = opts.version
+
+    session.run("rm", "-rf", "dist")
+    session.run("python", "-m", "build", "--outdir", "dist")
+
+
+@nox.session
+@add_opts
+def publish(session: nox.Session, opts: SessionParams) -> None:
+    """Publish the distribution"""
+
+    (
+        Installer(session=session, pip_deps="twine", update=opts.update)
+        .install_all(log_session=opts.log_session)
+        .run_commands(opts.publish_run)
     )
 
+    for cmd in opts.publish or []:
+        if cmd == "test":
+            session.run("twine", "upload", "--repository", "testpypi", "dist/*")
 
-nox.session(name="testdist-pypi", **ALL_KWS)(testdist)
-nox.session(name="testdist-conda", **CONDA_ALL_KWS)(testdist)
+        elif cmd == "release":
+            session.run("twine", "upload", "dist/*")
+
+
+# # ** Dist conda
+@nox.session(name="conda-recipe")
+@add_opts
+def conda_recipe(
+    session: nox.Session,
+    opts: SessionParams,
+) -> None:
+    """Run grayskull to create recipe"""
+    runner = Installer(
+        session=session, pip_deps=["grayskull"], update=opts.update
+    ).install_all(log_session=opts.log_session)
+
+    run, commands = opts.conda_recipe_run, opts.conda_recipe
+
+    runner.run_commands(run)
+
+    if not run and not commands:
+        commands = ["recipe"]
+
+    if not commands:
+        return
+
+    sdist_path = opts.conda_recipe_sdist_path
+    if not sdist_path:
+        sdist_path = PACKAGE_NAME
+        if opts.version:
+            sdist_path = f"{sdist_path}=={opts.version}"
+
+    for command in commands:
+        if command == "recipe":
+            # make directory?
+            if not (d := Path("./dist-conda")).exists():
+                d.mkdir()
+
+            session.run(
+                "grayskull",
+                "pypi",
+                sdist_path,
+                "--sections",
+                "package",
+                "source",
+                "build",
+                "requirements",
+                "-o",
+                "dist-conda",
+            )
+            _append_recipe(
+                f"dist-conda/{PACKAGE_NAME}/meta.yaml", "config/recipe-append.yaml"
+            )
+            session.run("cat", f"dist-conda/{PACKAGE_NAME}/meta.yaml", external=True)
+
+        elif command == "recipe-full":
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as d:  # type: ignore[assignment,unused-ignore]
+                session.run(
+                    "grayskull",
+                    "pypi",
+                    sdist_path,
+                    "-o",
+                    str(d),
+                )
+                session.run(
+                    "cat", str(Path(d) / PACKAGE_NAME / "meta.yaml"), external=True
+                )
+
+
+@nox.session(name="conda-build", **CONDA_DEFAULT_KWS)
+@add_opts
+def conda_build(session: nox.Session, opts: SessionParams) -> None:
+    runner = Installer.from_envname(
+        session=session, update=opts.update, conda_deps=["boa", "anaconda-client"]
+    ).install_all(log_session=opts.log_session)
+
+    cmds, run = opts.conda_build, opts.conda_build_run
+
+    runner.run_commands(run)
+
+    if not run and not cmds:
+        cmds = ["build", "clean"]
+
+    if cmds is None:
+        cmds = []
+
+    if "clean" in cmds:
+        cmds.remove("clean")
+        session.log("removing directory dist-conda/build")
+        if Path("./dist-conda/build").exists():
+            shutil.rmtree("./dist-conda/build")
+
+    for cmd in cmds:
+        if cmd == "build":
+            if not (d := Path(f"./dist-conda/{PACKAGE_NAME}/meta.yaml")).exists():
+                raise ValueError(f"no file {d}")
+
+            session.run(
+                "conda",
+                "mambabuild",
+                "--output-folder=dist-conda/build",
+                "--no-anaconda-upload",
+                "dist-conda",
+            )
 
 
 # * Utilities -------------------------------------------------------------------------
