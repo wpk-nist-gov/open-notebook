@@ -53,6 +53,7 @@ typing-extras = [
     "mypy >= 1.4.1",
 ]
 typing = [
+    "pytest",
     "open-notebook[typing-extras]", #
 
 ]
@@ -67,6 +68,7 @@ tools = [
     "scriv", # p2c: -p
     "nbqa",
     "pyright",
+    "conda-lock",
 ]
 dev-complete = [
     "open-notebook[dev]", #
@@ -106,16 +108,17 @@ base = false
 extras = ["dev"]
 
 [tool.pyproject2conda.envs.build]
-extras = false
+extras = "build-system.requires"
 reqs = ["build"]
 base = false
 style = "requirements"
 
 # make sure pip available to all conda environments
 # that install the package
-# [[tool.pyproject2conda.overrides]]
-# envs = ["test", "dev", "docs"]
-# deps = ["pip"]
+[[tool.pyproject2conda.overrides]]
+envs = ["test", "dev", "dev-complete", "dev-base", "docs"]
+deps = ["pip"]
+
 [[tool.pyproject2conda.overrides]]
 envs = ["test", "typing", "test-extras"]
 python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
@@ -135,8 +138,6 @@ license-files = ["LICENSE"]
 namespaces = true
 where = ["src"]
 
-## include = []
-## exclude = []
 [tool.setuptools.dynamic]
 readme = { file = [
     "README.md",

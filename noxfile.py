@@ -200,6 +200,7 @@ class SessionParams(DataclassParser):
 
     # build
     build_run: RUN_TYPE = None
+    build_isolation: bool = False
 
     # publish
     publish: list[Literal["release", "test"]] | None = argument("-p", "--publish")
@@ -322,7 +323,7 @@ def requirements(
     (
         Installer(
             session=session,
-            pip_deps="pyproject2conda>=0.8.0",
+            pip_deps="pyproject2conda>=0.11.0",
             update=opts.update,
         ).install_all(log_session=opts.log_session)
     )
@@ -736,7 +737,12 @@ nox.session(name="typing", **CONDA_ALL_KWS)(typing)
 @nox.session
 @add_opts
 def build(session: nox.Session, opts: SessionParams) -> None:
-    """Build the distribution"""
+    """
+    Build the distribution.
+
+    Note that default is to not use build isolation.
+    Pass `--build-isolation` to use build isolation.
+    """
     (
         Installer.from_envname(
             session=session,
@@ -748,8 +754,14 @@ def build(session: nox.Session, opts: SessionParams) -> None:
     if opts.version:
         session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = opts.version
 
-    session.run("rm", "-rf", "dist")
-    session.run("python", "-m", "build", "--outdir", "dist")
+    if Path("dist").exists():
+        shutil.rmtree("./dist")
+
+    args = "python -m build --outdir dist".split()
+    if not opts.build_isolation:
+        args.append("--no-isolation")
+
+    session.run(*args)
 
 
 @nox.session
@@ -873,6 +885,17 @@ def conda_build(session: nox.Session, opts: SessionParams) -> None:
                 "--no-anaconda-upload",
                 "dist-conda",
             )
+
+
+@nox.session
+@add_opts
+def cog(session: nox.Session, opts: SessionParams) -> None:
+    """Run cog."""
+
+    Installer.from_envname(
+        session=session, update=opts.update, pip_deps="cogapp"
+    ).install_all(log_session=opts.log_session)
+    session.run("cog", "-rP", "README.md", env={"COLUMNS": "90"})
 
 
 # * Utilities -------------------------------------------------------------------------

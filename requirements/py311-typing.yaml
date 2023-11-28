@@ -12,5 +12,6 @@ channels:
 dependencies:
   - python=3.11
   - mypy>=1.4.1
+  - pytest
   - tomli
   - typing-extensions

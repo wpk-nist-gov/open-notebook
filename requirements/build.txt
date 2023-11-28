@@ -8,3 +8,5 @@
 # Instead edit the corresponding pyproject.toml file.
 #
 build
+setuptools>=61.2
+setuptools_scm[toml]>=8.0
