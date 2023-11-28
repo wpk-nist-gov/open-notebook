@@ -35,6 +35,7 @@ from tools.dataclass_parser import DataclassParser, argument
 from tools.noxtools import (
     Installer,
     combine_list_str,
+    infer_requirement_path,
     is_conda_session,
     load_nox_config,
     open_webpage,
@@ -69,6 +70,8 @@ nox.options.envdir = f".nox/{PACKAGE_NAME}/envs"
 CONFIG = load_nox_config()
 
 # * Options ---------------------------------------------------------------------------
+
+LOCK = True
 
 PYTHON_ALL_VERSIONS = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 PYTHON_DEFAULT_VERSION = "3.11"
@@ -141,6 +144,9 @@ class SessionParams(DataclassParser):
     conda_lock_mamba: bool = False
     conda_lock_force: bool = False
 
+    # pip-compile
+    pip_compile_force: bool = False
+
     # test
     test_no_pytest: bool = False
     test_opts: OPT_TYPE = argument(help="options to pytest")
@@ -170,7 +176,7 @@ class SessionParams(DataclassParser):
             "open",
             "serve",
         ]
-    ] | None = argument("--docs", "-d")
+    ] | None = argument("--docs", "-d", help="doc commands")
     docs_run: RUN_TYPE = None
 
     # lint (pre-commit)
@@ -211,7 +217,16 @@ class SessionParams(DataclassParser):
 
 @lru_cache
 def parse_posargs(*posargs: str) -> SessionParams:
-    return SessionParams.from_posargs(posargs=posargs, prefix_char="+")
+    """
+    Get Parser using `+` for session option prefix.
+
+    Note that using `+` allows for passing underlying `-` options
+    without escaping.
+    """
+    out = SessionParams.from_posargs(posargs=posargs, prefix_char="+")
+    if LOCK:
+        out.lock = LOCK
+    return out
 
 
 def add_opts(
@@ -232,7 +247,7 @@ def dev(
     session: Session,
     opts: SessionParams,
 ) -> None:
-    """Create dev env using conda."""
+    """Create development environment using either conda (dev) or virtualenv (dev-venv)."""
 
     (
         Installer.from_envname(
@@ -301,7 +316,7 @@ def requirements(
     """
     Create environment.yaml and requirement.txt files from pyproject.toml using pyproject2conda.
 
-    These will be placed in the directory "./environments".
+    These will be placed in the directory "./requirements".
     """
 
     (
@@ -387,6 +402,47 @@ def conda_lock(
     session_run_commands(session, opts.conda_lock_run)
     for path in (ROOT / "requirements").relative_to(ROOT.cwd()).glob("py*.yaml"):
         create_lock(path)
+
+
+@nox.session(name="pip-compile", **ALL_KWS)
+@add_opts
+def pip_compile(
+    session: Session,
+    opts: SessionParams,
+) -> None:
+    """Run pip-compile."""
+
+    (
+        Installer(
+            session=session, pip_deps=["pip-tools"], update=opts.update
+        ).install_all(log_session=opts.log_session)
+    )
+
+    envs_all = ["test", "typing"]
+    envs_dev = ["dev", "dev-complete", "dev-base", "docs"]
+
+    if session.python == PYTHON_DEFAULT_VERSION:
+        envs = envs_all + envs_dev
+    else:
+        envs = envs_all
+
+    for env in envs:
+        assert isinstance(session.python, str)
+        reqspath = infer_requirement_path(env, ext=".txt")
+        lockpath = infer_requirement_path(
+            env,
+            ext=".txt",
+            python_version=session.python,
+            lock=True,
+            check_exists=False,
+        )
+
+        if opts.pip_compile_force or update_target(lockpath, reqspath):
+            session.log(f"Creating {lockpath}")
+            session.run("pip-compile", "-U", "-o", lockpath, reqspath)
+
+        else:
+            session.log(f"Skipping {lockpath}")
 
 
 # ** testing

@@ -50,11 +50,12 @@ def _verify_paths(
     return [_verify_path(p) for p in paths]
 
 
-def _infer_path(
+def infer_requirement_path(
     name: str | None,
     ext: str | None = None,
     python_version: str | None = None,
     lock: bool = False,
+    check_exists: bool = True,
 ) -> str:
     """Get filename for a conda yaml or pip requirements file."""
     if name is None:
@@ -83,12 +84,13 @@ def _infer_path(
     else:
         filename = f"./requirements/{filename}"
 
-    assert Path(filename).is_file(), f"{filename} does not exist."
+    if check_exists:
+        assert Path(filename).is_file(), f"{filename} does not exist."
 
     return filename
 
 
-def _infer_paths(
+def _infer_requirement_paths(
     names: str | Iterable[str] | None,
     lock: bool = False,
     ext: str | None = None,
@@ -100,7 +102,7 @@ def _infer_paths(
         names = [names]
 
     return [
-        _infer_path(name, lock=lock, ext=ext, python_version=python_version)
+        infer_requirement_path(name, lock=lock, ext=ext, python_version=python_version)
         for name in names
     ]
 
@@ -179,23 +181,30 @@ class Installer:
         self.conda_deps: list[str] = sorted(_remove_whitespace_list(conda_deps or []))
         self.channels: list[str] = sorted(_remove_whitespace_list(channels or []))
 
-        if self.lock and self.is_conda_session:
-            if conda_lock_path is None:
-                raise ValueError("Must pass conda")
-            if (
-                self.conda_deps
-                or self.channels
-                or self.pip_deps
-                or self.requirements
-                or self.constraints
-            ):
-                raise ValueError(
-                    "Can not pass conda_deps, channels, pip_deps, requirements, constraints if using conda-lock"
-                )
+        if not self.is_conda_session:
+            if self.conda_deps or self.channels or conda_lock_path:
+                raise ValueError("passing conda parameters to non conda session")
 
-            conda_lock_path = _verify_path(conda_lock_path)
-        else:
-            conda_lock_path = None
+        if self.lock:
+            if not self.is_conda_session:
+                if (not self.requirements) or self.pip_deps or self.constraints:
+                    raise ValueError("Can only pass requirements for locked virtualenv")
+
+            else:
+                if conda_lock_path is None:
+                    raise ValueError("Must pass conda_lock_path")
+                elif (
+                    self.conda_deps
+                    or self.channels
+                    or self.pip_deps
+                    or self.requirements
+                    or self.constraints
+                ):
+                    raise ValueError(
+                        "Can not pass conda_deps, channels, pip_deps, requirements, constraints if using conda-lock"
+                    )
+
+                conda_lock_path = _verify_path(conda_lock_path)
 
         self.conda_lock_path = conda_lock_path
 
@@ -515,7 +524,7 @@ class Installer:
         if paths or envname:
             assert isinstance(session.python, str)
 
-            paths = _infer_paths(
+            paths = _infer_requirement_paths(
                 envname, ext=".yaml", lock=False, python_version=session.python
             ) + _verify_paths(paths)
 
@@ -545,12 +554,16 @@ class Installer:
         **kwargs: Any,
     ) -> Self:
         if lock:
-            raise ValueError("lock not yet supported?")
-
-        if envname is not None:
-            requirements = _verify_paths(requirements) + _infer_paths(
-                envname, ext=".txt"
+            assert isinstance(session.python, str)
+            requirements = _verify_paths(requirements) + _infer_requirement_paths(
+                envname, ext=".txt", lock=lock, python_version=session.python
             )
+
+        else:
+            if envname is not None:
+                requirements = _verify_paths(requirements) + _infer_requirement_paths(
+                    envname, ext=".txt"
+                )
 
         return cls(
             session=session,
@@ -584,7 +597,7 @@ class Installer:
                 assert isinstance(
                     envname, str
                 ), "Must supply conda_lock_path or envname"
-                conda_lock_path = _infer_path(envname, ext=".yaml", python_version=session.python, lock=lock)  # type: ignore
+                conda_lock_path = infer_requirement_path(envname, ext=".yaml", python_version=session.python, lock=lock)  # type: ignore
 
             return cls(
                 session=session, lock=lock, conda_lock_path=conda_lock_path, **kwargs
