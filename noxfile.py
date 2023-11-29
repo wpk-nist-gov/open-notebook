@@ -9,21 +9,17 @@ from functools import lru_cache, wraps
 # Should only use on python version > 3.10
 assert sys.version_info >= (3, 10)
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
+    Annotated,
     Callable,
     Iterator,
     Literal,
     Sequence,
+    TypeAlias,
     TypedDict,
 )
-
-if sys.version_info > (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias  # noqa
-
-from dataclasses import dataclass
 
 import nox  # type: ignore[unused-ignore,import]
 from nox import Session
@@ -31,7 +27,7 @@ from nox import Session
 # fmt: off
 sys.path.insert(0, ".")
 
-from tools.dataclass_parser import DataclassParser, argument
+from tools.dataclass_parser import DataclassParser, add_option, option
 from tools.noxtools import (
     Installer,
     combine_list_str,
@@ -110,6 +106,14 @@ ALL_KWS: SessionOptionsDict = {"python": PYTHON_ALL_VERSIONS}
 OPT_TYPE: TypeAlias = list[str] | None
 RUN_TYPE: TypeAlias = list[list[str]] | None
 
+RUN_ANNO = Annotated[
+    RUN_TYPE,
+    option(
+        help="Run external commands in session.  Specify multiple times for multiple commands."
+    ),
+]
+OPT_ANNO = Annotated[OPT_TYPE, option(help="Options to command.")]
+
 
 @dataclass
 class SessionParams(DataclassParser):
@@ -117,30 +121,30 @@ class SessionParams(DataclassParser):
 
     # common parameters
     lock: bool = False
-    update: bool = argument("--update", "-U", help="update dependencies/package")
-    update_package: bool = argument(
+    update: bool = add_option("--update", "-U", help="update dependencies/package")
+    update_package: bool = add_option(
         "--update-package", "-P", help="update package only"
     )
-    log_session: bool = argument("--log-session", "-L")
+    log_session: bool = add_option("--log-session", "-L")
     version: str | None = None
 
     # dev
-    dev_run: RUN_TYPE = argument(help="Run external in dev env")
+    dev_run: RUN_ANNO = None
 
     # config
-    dev_extras: OPT_TYPE = argument(help="`extras` to include in dev environment")
-    python_paths: OPT_TYPE = argument(help="paths to python executables")
+    dev_extras: OPT_TYPE = add_option(help="`extras` to include in dev environment")
+    python_paths: OPT_TYPE = add_option(help="paths to python executables")
 
     # requirements
     requirements_force: bool = False
 
     # conda-lock
-    conda_lock_channel: OPT_TYPE = argument(help="conda channels")
+    conda_lock_channel: OPT_TYPE = add_option(help="conda channels")
     conda_lock_platform: list[
         Literal["osx-64", "linux-64", "win-64", "all"]
-    ] | None = None
-    conda_lock_include: OPT_TYPE = argument(help="lock files to create")
-    conda_lock_run: RUN_TYPE = argument(help="run internal")
+    ] | None = add_option(help="platform(s) to buiuld lock file for.")
+    conda_lock_include: OPT_TYPE = add_option(help="lock files to create")
+    conda_lock_run: RUN_ANNO = None
     conda_lock_mamba: bool = False
     conda_lock_force: bool = False
 
@@ -149,17 +153,17 @@ class SessionParams(DataclassParser):
 
     # test
     test_no_pytest: bool = False
-    test_opts: OPT_TYPE = argument(help="options to pytest")
-    test_run: RUN_TYPE = None
+    test_opts: OPT_TYPE = add_option(help="Options to pytest")
+    test_run: RUN_ANNO = None
     no_cov: bool = False
 
     # coverage
     coverage: list[Literal["erase", "combine", "report", "html", "open"]] | None = None
-    coverage_run: RUN_TYPE = None
+    coverage_run: RUN_ANNO = None
     coverage_run_internal: RUN_TYPE = None
 
     # testdist
-    testdist_run: RUN_TYPE = None
+    testdist_run: RUN_ANNO = None
 
     # docs
     docs: list[
@@ -176,11 +180,11 @@ class SessionParams(DataclassParser):
             "open",
             "serve",
         ]
-    ] | None = argument("--docs", "-d", help="doc commands")
-    docs_run: RUN_TYPE = None
+    ] | None = add_option("--docs", "-d", help="doc commands")
+    docs_run: RUN_ANNO = None
 
     # lint (pre-commit)
-    lint_run: RUN_TYPE = None
+    lint_run: RUN_ANNO = None
 
     # typing
     typing: list[
@@ -194,26 +198,28 @@ class SessionParams(DataclassParser):
             "nbqa-pyright",
             "nbqa-typing",
         ]
-    ] = argument("--typing", "-m")
-    typing_run: RUN_TYPE = None
-    typing_run_internal: RUN_TYPE = None
+    ] = add_option("--typing", "-m")
+    typing_run: RUN_ANNO = None
+    typing_run_internal: RUN_TYPE = add_option(
+        help="Run internal (in session) commands."
+    )
 
     # build
-    build_run: RUN_TYPE = None
+    build_run: RUN_ANNO = None
     build_isolation: bool = False
 
     # publish
-    publish: list[Literal["release", "test"]] | None = argument("-p", "--publish")
-    publish_run: RUN_TYPE = None
+    publish: list[Literal["release", "test"]] | None = add_option("-p", "--publish")
+    publish_run: RUN_ANNO = None
 
     # conda-recipe/grayskull
     conda_recipe: list[Literal["recipe", "recipe-full"]] | None = None
-    conda_recipe_run: RUN_TYPE = None
+    conda_recipe_run: RUN_ANNO = None
     conda_recipe_sdist_path: str | None = None
 
     # conda-build
     conda_build: list[Literal["build", "clean"]] | None = None
-    conda_build_run: RUN_TYPE = None
+    conda_build_run: RUN_ANNO = None
 
 
 @lru_cache
@@ -358,10 +364,9 @@ def conda_lock(
     conda_lock_exclude = ["test-extras"]
 
     platform = opts.conda_lock_platform
-    if not platform:
-        platform = ["osx-64"]
-    elif "all" in platform:
-        platform = ["linux-64", "osx-64", "win-64"]
+
+    if platform is None or "all" in platform:
+        platform = []
 
     channel = opts.conda_lock_channel
     if not channel:
@@ -589,8 +594,8 @@ def docs(
     opts: SessionParams,
 ) -> None:
     """
-    Runs make in docs directory. For example, 'nox -s docs -- --docs-cmd
-    html' -> 'make -C docs html'. With 'release' option, you can set the
+    Runs make in docs directory. For example, 'nox -s docs -- +d html'
+    calls 'make -C docs html'. With 'release' option, you can set the
     message with 'message=...' in posargs.
     """
     runner = Installer.from_envname(
@@ -600,8 +605,6 @@ def docs(
         log_session=opts.log_session,
         display_name=f"{PACKAGE_NAME}-{session.name}",
     )
-
-    # _docs(session=session, cmd=opts.docs, run=opts.docs_run, opts.version=opts.version)
 
     if opts.version:
         session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = opts.version

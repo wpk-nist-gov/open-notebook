@@ -66,15 +66,11 @@ dev = [
 tools = [
     "pre-commit", #
     "scriv", # p2c: -p
-    "nbqa",
+    # "nbqa",
     "pyright",
     "conda-lock",
 ]
-dev-complete = [
-    "open-notebook[dev]", #
-    "open-notebook[tools]",
-    "open-notebook[nox]",
-]
+dev-complete = ["open-notebook[dev,nox,tools]"]
 docs = [
     "ipython", #
     "pyenchant",

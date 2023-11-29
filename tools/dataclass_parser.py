@@ -7,6 +7,26 @@ There are some libraries out there that mostly do what we want, but none are qui
 Took motivation from the following:
 https://github.com/typed-argparse/typed-argparse
 https://github.com/SunDoge/typed-args
+https://github.com/rmorshea/noxopt
+
+
+To get a parser use something like:
+
+from typing import TypeAlias
+RUN_TYPE: TypeAlias = list[list[str]] | None
+
+
+@dataclass
+class Example(DataclassParser):
+    cmd: list[Literal['a','b']] | None = add_option("-c", "--cmd")
+    run: Annotated[list[list[str]] | None, Option(help='hello')] = add_option("-r", "--run")
+    another: Annotated[list[list[str]] | None, option("-a", "--another", help='hello')] = None
+
+    other: RUN_TYPE = add_option(help="hello")
+    version: str | None = None
+    lock: bool = False
+    no_cov: bool = False
+
 """
 from __future__ import annotations
 
@@ -28,7 +48,7 @@ assert sys.version_info >= (3, 10)
 # else:
 #     from typing import Annotated, get_args, get_origin, get_type_hints
 
-from typing import get_args, get_origin, get_type_hints
+from typing import Annotated, get_args, get_origin, get_type_hints
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -43,8 +63,112 @@ UNDEFINED = cast(
     type("Undefined", (), {"__repr__": lambda self: "UNDEFINED"})(),  # pyright: ignore
 )
 
+# @dataclass
+# class Parser(DataclassParser):
+#     flag0: bool = False # --flag0 will lead to True value
+#     flag1: Annotated[bool, Option(flags=help="another flag")] = False # --flag1 will lead to true with help
+#     flag2: bool = add_option()
 
-def argument(
+
+@dataclass
+class Option:
+    """Class to handle options."""
+
+    flags: Sequence[str] = UNDEFINED
+    # remainder are alphabetical
+    action: str | None = UNDEFINED
+    choices: Container[Any] = UNDEFINED
+    const: Any = UNDEFINED
+    default: Any | None = UNDEFINED
+    dest: str = UNDEFINED
+    help: str = UNDEFINED
+    metavar: str = UNDEFINED
+    nargs: str | int | None = UNDEFINED
+    required: bool = UNDEFINED
+    type: int | float | Callable[[Any], Any] = UNDEFINED
+    prefix_char: str = "-"
+
+    def __post_init__(self) -> None:
+        if isinstance(self.flags, str):
+            self.flags = (self.flags,)
+        if self.flags is not UNDEFINED:
+            for f in self.flags:
+                if not f.startswith(self.prefix_char):
+                    raise ValueError(f"Option only supports flags, but got {f!r}")
+
+    def asdict(self) -> dict[str, Any]:
+        return {
+            k: v
+            for k, v in (
+                # Can't use asdict() since that deep copies and we need
+                # to filter using an identity check against UNDEFINED.
+                [
+                    (f.name, getattr(self, f.name))
+                    for f in fields(self)
+                    if f.name != "prefix_char"
+                ]
+            )
+            if v is not UNDEFINED
+        }
+
+    def add_argument_to_parser(
+        self, parser: ArgumentParser, prefix_char: str = "-"
+    ) -> None:
+        kwargs = self.asdict()
+
+        flags = kwargs.pop("flags")
+
+        # make sure flags have correct prefixing:
+        if not all(flag.startswith(prefix_char) for flag in flags):
+            new_flags: list[str] = []
+            for flag in flags:
+                if flag.startswith(prefix_char):
+                    new_flags.append(flag)
+                elif flag.startswith("--"):
+                    new_flags.append(prefix_char * 2 + flag.lstrip("-"))
+                elif flag.startswith("-"):
+                    new_flags.append(prefix_char + flag.lstrip("-"))
+                else:
+                    raise ValueError(f"bad flag {flag} prefix_char {prefix_char}")
+
+            flags = new_flags
+
+        parser.add_argument(*flags, **kwargs)
+
+    @classmethod
+    def factory(
+        cls,
+        *flags: str,
+        action: str | None = UNDEFINED,
+        choices: Container[Any] = UNDEFINED,
+        const: Any = UNDEFINED,
+        default: Any | None = UNDEFINED,
+        dest: str = UNDEFINED,
+        help: str = UNDEFINED,
+        metavar: str = UNDEFINED,
+        nargs: str | int | None = UNDEFINED,
+        required: bool = UNDEFINED,
+        type: int | float | Callable[[Any], Any] = UNDEFINED,
+    ) -> Self:
+        return cls(
+            flags=flags or UNDEFINED,
+            action=action,
+            choices=choices,
+            const=const,
+            default=default,
+            dest=dest,
+            help=help,
+            metavar=metavar,
+            nargs=nargs,
+            required=required,
+            type=type,
+        )
+
+
+option = Option.factory
+
+
+def add_option(
     *flags: str,
     default: Any = None,
     action: str | None = UNDEFINED,
@@ -60,19 +184,19 @@ def argument(
 ) -> Any:
     return field(
         metadata={
-            "parser": {
-                "flags": flags,
-                "action": action,
-                "choices": choices,
-                "const": const,
-                "default": default,
-                "dest": dest,
-                "help": help,
-                "metavar": metavar,
-                "nargs": nargs,
-                "required": required,
-                "type": type,
-            }
+            "option": Option.factory(
+                *flags,
+                default=default,
+                action=action,
+                choices=choices,
+                const=const,
+                dest=dest,
+                help=help,
+                metavar=metavar,
+                nargs=nargs,
+                required=required,
+                type=type,
+            )
         },
         default=default,
     )
@@ -114,85 +238,18 @@ class DataclassParser:
         return cls(**vars(parsed))
 
 
-@dataclass
-class Option:
-    """Class to handle options."""
-
-    flags: Sequence[str] = UNDEFINED
-    # remainder are alphabetical
-    action: str | None = UNDEFINED
-    choices: Container[Any] = UNDEFINED
-    const: Any = UNDEFINED
-    default: Any | None = UNDEFINED
-    dest: str = UNDEFINED
-    help: str = UNDEFINED
-    metavar: str = UNDEFINED
-    nargs: str | int | None = UNDEFINED
-    required: bool = UNDEFINED
-    type: int | float | Callable[[Any], Any] = UNDEFINED
-    prefix_char: str = "-"
-
-    def __post_init__(self) -> None:
-        if isinstance(self.flags, str):
-            self.flags = (self.flags,)
-        if self.flags is not UNDEFINED:
-            for f in self.flags:
-                if not f.startswith(self.prefix_char):
-                    raise ValueError(f"Option only supports flags, but got {f!r}")
-
-    def add_argument_to_parser(
-        self, parser: ArgumentParser, prefix_char: str = "-"
-    ) -> None:
-        kwargs = {
-            k: v
-            for k, v in (
-                # Can't use asdict() since that deep copies and we need
-                # to filter using an identity check against UNDEFINED.
-                [
-                    (f.name, getattr(self, f.name))
-                    for f in fields(self)
-                    if f.name != "prefix_char"
-                ]
-            )
-            if v is not UNDEFINED
-        }
-
-        flags = kwargs.pop("flags")
-
-        # make sure flags have correct prefixing:
-        if not all(flag.startswith(prefix_char) for flag in flags):
-            new_flags: list[str] = []
-            for flag in flags:
-                if flag.startswith(prefix_char):
-                    new_flags.append(flag)
-                elif flag.startswith("--"):
-                    new_flags.append(prefix_char * 2 + flag.lstrip("-"))
-                elif flag.startswith("-"):
-                    new_flags.append(prefix_char + flag.lstrip("-"))
-                else:
-                    raise ValueError(f"bad flag {flag} prefix_char {prefix_char}")
-
-            flags = new_flags
-
-        parser.add_argument(*flags, **kwargs)
-
-
 def get_dataclass_options(cls: Any) -> dict[str, Option]:
     options: dict[str, Option] = {}
 
-    for name, (metadata, annotation) in _get_dataclass_metadata_and_annotations(
-        cls
-    ).items():
-        opt = _create_option(name=name, metadata=metadata, annotation=annotation)
-        if opt is not None:
-            options[name] = opt
+    for name, (annotation, opt) in _get_dataclass_annotations_and_options(cls).items():
+        opt = _create_option(name=name, opt=opt, annotation=annotation)
 
     return options
 
 
-def _get_dataclass_metadata_and_annotations(
+def _get_dataclass_annotations_and_options(
     cls: Any,
-) -> dict[str, tuple[dict[str, Any], Any]]:
+) -> dict[str, tuple[Any, Option]]:
     annotations = get_type_hints(cls, include_extras=True)
 
     assert is_dataclass(cls)
@@ -203,19 +260,38 @@ def _get_dataclass_metadata_and_annotations(
         if f.name.startswith("_") or not f.init:
             continue
         else:
-            out[f.name] = (
-                f.metadata.get("parser", {}),
-                annotations[f.name],
-            )
+            opt = f.metadata.get("option", Option(default=f.default))
+
+            # Can also pass via annotations
+            annotation = annotations[f.name]
+            if get_origin(annotation) is Annotated:
+                annotation, opt_anno, *_ = get_args(annotation)
+                if isinstance(opt_anno, Option):
+                    opt = Option(**{**opt_anno.asdict(), **opt.asdict()})
+
+            out[f.name] = (annotation, opt)
+            #     annotations[f.name],
+            #     f.metadata.get("option", Option(default=f.default)),
+            # )
     return out
 
 
 def _create_option(
     name: str,
-    metadata: dict[str, Any],
+    opt: Option,
     annotation: Any,
-) -> Option | None:
-    opt = Option(**metadata)
+) -> Option:
+    # Can also pass via annotations
+    # if this is the case, explicity options from add_option
+    # will take precidence.
+    # if get_origin(annotation) is Annotated:
+    #     opt_type, opt_anno, *_ = get_args(annotation)
+
+    #     if isinstance(opt_anno, Option):
+    #         opt = Option(**{**opt_anno.asdict(), **opt.asdict()})
+
+    # else:
+    #     opt_type = annotation
 
     depth, underlying_type = _get_underlying_type(annotation)
 
