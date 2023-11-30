@@ -1,7 +1,7 @@
 {
-  "template": "https://github.com/usnistgov/cookiecutter-nist-python.git",
+  "template": "https://github.com/wpk-nist-gov/cookiecutter-nist-python.git",
   "commit": "a7672e135dcff871c3a12ef0f2d9d7ece8d08c97",
-  "checkout": "develop",
+  "checkout": "feature/update-nox",
   "context": {
     "cookiecutter": {
       "project_name": "open-notebook",
