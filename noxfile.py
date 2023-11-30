@@ -207,6 +207,7 @@ class SessionParams(DataclassParser):
     )
 
     # build
+    build: list[Literal["build", "version"]] | None = None
     build_run: RUN_ANNO = None
     build_isolation: bool = False
 
@@ -775,14 +776,19 @@ def build(session: nox.Session, opts: SessionParams) -> None:
     if opts.version:
         session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = opts.version
 
-    if Path("dist").exists():
-        shutil.rmtree("./dist")
+    for cmd in opts.build or ["build"]:
+        if cmd == "version":
+            session.run("python", "-m", "setuptools_scm")
 
-    args = "python -m build --outdir dist".split()
-    if not opts.build_isolation:
-        args.append("--no-isolation")
+        elif cmd == "build":
+            if Path("dist").exists():
+                shutil.rmtree("./dist")
 
-    session.run(*args)
+            args = "python -m build --outdir dist".split()
+            if not opts.build_isolation:
+                args.append("--no-isolation")
+
+            session.run(*args)
 
 
 @nox.session
