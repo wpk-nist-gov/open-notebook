@@ -52,9 +52,8 @@ typing-extras = [
     "mypy >= 1.4.1",
 ]
 typing = [
-    "pytest",
     "open-notebook[typing-extras]", #
-
+    "pytest",
 ]
 nox = ["nox", "ruamel.yaml"]
 dev = [
@@ -69,7 +68,11 @@ tools = [
     "pyright",
     "conda-lock",
 ]
-dev-complete = ["open-notebook[dev,nox,tools]"]
+dev-complete = [
+    "open-notebook[dev,nox,tools]", #
+    "open-notebook[tools]",
+    "open-notebook[nox]",
+]
 docs = [
     "ipython", #
     "pyenchant",

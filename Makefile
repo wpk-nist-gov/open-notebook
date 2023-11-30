@@ -141,9 +141,6 @@ version-scm: ## check/update version of package with setuptools-scm
 version-import: ## check version from python import
 	-python -c 'import open_notebook; print(open_notebook.__version__)'
 
-version-update: ## update version using nox
-	nox -s update-version-scm
-
 version: version-scm version-import
 
 ################################################################################
@@ -175,7 +172,7 @@ test-all: requirements/test.txt ## run tests on every Python version with nox.
 	$(NOX) -s test
 
 # ** docs
-.PHONY: docs-build docs-release docs-clean docs-command
+.PHONY: docs-build docs-release docs-clean
 docs-build: ## build docs in isolation
 	$(NOX) -s docs -- +d build
 docs-clean: ## clean docs
@@ -216,7 +213,7 @@ typing-mypy typing-pyright typing-pytype typing-all: requirements/typing.txt
 build: requirements/build.txt ## build dist
 	$(NOX) -s build
 testrelease: ## test release on testpypi
-	$(NOX) -s publish -- +p testrelease
+	$(NOX) -s publish -- +p test
 release: ## release to pypi, can pass posargs=...
 	$(NOX) -s publish -- +p release
 
@@ -275,14 +272,12 @@ nbqa-typing: nbqa-mypy nbqa-pyright ## run nbqa mypy/pyright
 pytest-nbval:  ## run pytest --nbval
 	pytest --nbval --current-env --sanitize-with=config/nbval.ini $(NOTEBOOKS) -x
 
+.PHONY: typing-tools
+typing-tools:
+	mypy noxfile.py tools
+	pyright noxfile.py tools
 
 .PHONY: cog-readme
 cog-readme: ## apply cog to README.md
 	nox -s cog
 	pre-commit run markdownlint --files README.md
-
-
-.PHONY: typing-tools
-typing-tools:
-	mypy noxfile.py tools
-	pyright noxfile.py tools
