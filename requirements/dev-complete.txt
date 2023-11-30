@@ -7,10 +7,10 @@
 # You should not manually edit this file.
 # Instead edit the corresponding pyproject.toml file.
 #
+conda-lock
 ipykernel
 ipython
 mypy>=1.4.1
-nbqa
 nox
 pre-commit
 pyright

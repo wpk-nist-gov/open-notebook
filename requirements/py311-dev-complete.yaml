@@ -11,10 +11,10 @@ channels:
   - conda-forge
 dependencies:
   - python=3.11
+  - conda-lock
   - ipykernel
   - ipython
   - mypy>=1.4.1
-  - nbqa
   - nox
   - pre-commit
   - pyright

@@ -105,7 +105,7 @@ termcolor==2.3.0
     # via pytest-sugar
 tomli==2.0.1
     # via -r ./requirements/dev-base.txt
-tornado==6.3.3
+tornado==6.4
     # via
     #   ipykernel
     #   jupyter-client

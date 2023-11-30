@@ -30,6 +30,7 @@ sys.path.insert(0, ".")
 from tools.dataclass_parser import DataclassParser, add_option, option
 from tools.noxtools import (
     Installer,
+    check_hash_path_for_change,
     combine_list_str,
     infer_requirement_path,
     is_conda_session,
@@ -38,6 +39,7 @@ from tools.noxtools import (
     prepend_flag,
     session_run_commands,
     update_target,
+    write_hashes,
 )
 
 sys.path.pop(0)
@@ -141,7 +143,7 @@ class SessionParams(DataclassParser):
     # conda-lock
     conda_lock_channel: OPT_TYPE = add_option(help="conda channels")
     conda_lock_platform: list[
-        Literal["osx-64", "linux-64", "win-64", "all"]
+        Literal["osx-64", "linux-64", "win-64", "osx-arm64", "all"]
     ] | None = add_option(help="platform(s) to buiuld lock file for.")
     conda_lock_include: OPT_TYPE = add_option(help="lock files to create")
     conda_lock_run: RUN_ANNO = None
@@ -230,10 +232,10 @@ def parse_posargs(*posargs: str) -> SessionParams:
     Note that using `+` allows for passing underlying `-` options
     without escaping.
     """
-    out = SessionParams.from_posargs(posargs=posargs, prefix_char="+")
-    if LOCK:
-        out.lock = LOCK
-    return out
+    opts = SessionParams.from_posargs(posargs=posargs, prefix_char="+")
+    opts.lock = opts.lock or LOCK
+
+    return opts
 
 
 def add_opts(
@@ -245,6 +247,13 @@ def add_opts(
         return func(session, opts)
 
     return wrapped
+
+
+# def get_lock(session: Session, lock: bool, global_lock: bool = False) -> bool:
+#     return (
+#         lock
+#         or (not is_conda_session(session) and global_lock)
+#     )
 
 
 # * Environments------------------------------------------------------------------------
@@ -341,6 +350,10 @@ def requirements(
         *(["--overwrite", "force"] if opts.requirements_force else []),
     )
 
+    if opts.lock:
+        for py in PYTHON_ALL_VERSIONS:
+            session.notify(f"pip-compile-{py}")
+
 
 # # ** conda-lock
 @nox.session(name="conda-lock", **DEFAULT_KWS)
@@ -361,12 +374,12 @@ def conda_lock(
 
     session.run("conda-lock", "--version")
 
-    conda_lock_exclude = ["test-extras"]
+    conda_lock_exclude = ["test-extras", "dev"]
 
     platform = opts.conda_lock_platform
-
     if platform is None or "all" in platform:
-        platform = []
+        # for now, skip osx-arm64 and win-64.  Leads to some problems.
+        platform = ["osx-64", "linux-64"]
 
     channel = opts.conda_lock_channel
     if not channel:
@@ -389,7 +402,9 @@ def conda_lock(
                 session.log(f"Skipping {lockfile} (exclude)")
                 return
 
-        if opts.conda_lock_force or update_target(lockfile, *deps):
+        # check hashes
+        changed, hash_path, hashes = check_hash_path_for_change(lockfile, *deps)
+        if opts.conda_lock_force or changed:
             session.log(f"Creating {lockfile}")
             # insert -f for each arg
             if lockfile.exists():
@@ -402,6 +417,7 @@ def conda_lock(
                 *prepend_flag("-f", *deps),
                 f"--lockfile={lockfile}",
             )
+            write_hashes(hash_path, hashes)
         else:
             session.log(f"Skipping {lockfile} (exists)")
 
@@ -443,9 +459,11 @@ def pip_compile(
             check_exists=False,
         )
 
-        if opts.pip_compile_force or update_target(lockpath, reqspath):
+        changed, hash_path, hashes = check_hash_path_for_change(lockpath, reqspath)
+        if opts.pip_compile_force or changed:
             session.log(f"Creating {lockpath}")
             session.run("pip-compile", "-U", "-o", lockpath, reqspath)
+            write_hashes(hash_path, hashes)
 
         else:
             session.log(f"Skipping {lockpath}")
@@ -508,8 +526,8 @@ def test(
     )
 
 
-nox.session(name="test-venv", **ALL_KWS)(test)
-nox.session(name="test", **CONDA_ALL_KWS)(test)
+nox.session(name="test", **ALL_KWS)(test)
+nox.session(name="test-conda", **CONDA_ALL_KWS)(test)
 
 
 # *** coverage
@@ -646,8 +664,8 @@ def docs(
         )
 
 
-nox.session(name="docs-venv", **DEFAULT_KWS)(docs)
-nox.session(name="docs", **CONDA_DEFAULT_KWS)(docs)
+nox.session(name="docs", **DEFAULT_KWS)(docs)
+nox.session(name="docs-conda", **CONDA_DEFAULT_KWS)(docs)
 
 
 # ** lint
@@ -732,8 +750,8 @@ def typing(
     runner.run_commands(opts.typing_run_internal, external=False)
 
 
-nox.session(name="typing-venv", **ALL_KWS)(typing)
-nox.session(name="typing", **CONDA_ALL_KWS)(typing)
+nox.session(name="typing", **ALL_KWS)(typing)
+nox.session(name="typing-conda", **CONDA_ALL_KWS)(typing)
 
 
 # # ** Dist pypi
@@ -890,6 +908,7 @@ def conda_build(session: nox.Session, opts: SessionParams) -> None:
             )
 
 
+# ** Other utilities
 @nox.session
 @add_opts
 def cog(session: nox.Session, opts: SessionParams) -> None:

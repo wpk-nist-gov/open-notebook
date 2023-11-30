@@ -239,12 +239,12 @@ class DataclassParser:
 
 
 def get_dataclass_options(cls: Any) -> dict[str, Option]:
-    options: dict[str, Option] = {}
-
-    for name, (annotation, opt) in _get_dataclass_annotations_and_options(cls).items():
-        opt = _create_option(name=name, opt=opt, annotation=annotation)
-
-    return options
+    return {
+        name: _create_option(name=name, opt=opt, annotation=annotation)
+        for name, (annotation, opt) in _get_dataclass_annotations_and_options(
+            cls
+        ).items()
+    }
 
 
 def _get_dataclass_annotations_and_options(
