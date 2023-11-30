@@ -141,7 +141,6 @@ packaging==23.2
     #   nox
     #   pytest
     #   pytest-sugar
-    #   setuptools-scm
 parso==0.8.3
     # via jedi
 pastel==0.2.1
@@ -215,8 +214,6 @@ ruamel-yaml-clib==0.2.8
     # via ruamel-yaml
 scriv==1.5.0
     # via -r ./requirements/dev-complete.txt
-setuptools-scm==8.0.4
-    # via -r ./requirements/dev-complete.txt
 six==1.16.0
     # via
     #   asttokens
@@ -253,7 +250,6 @@ typing-extensions==4.8.0
     #   mypy
     #   pydantic
     #   pydantic-core
-    #   setuptools-scm
 urllib3==1.26.18
     # via
     #   conda-lock

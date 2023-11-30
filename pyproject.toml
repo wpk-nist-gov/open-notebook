@@ -43,7 +43,6 @@ test = [
     "pytest-sugar",
 ]
 dev-extras = [
-    "setuptools-scm>=8.0", #
     "pytest-accept", # p2c: -p
     "ipython",
     "ipykernel",

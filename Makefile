@@ -136,7 +136,7 @@ coverage: ## check code coverage quickly with the default Python
 .PHONY: version-scm version-import version
 
 version-scm: ## check/update version of package with setuptools-scm
-	python -m setuptools_scm
+	nox -s build -- ++build version
 
 version-import: ## check version from python import
 	-python -c 'import open_notebook; print(open_notebook.__version__)'

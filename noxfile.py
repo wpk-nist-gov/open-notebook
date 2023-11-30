@@ -250,13 +250,6 @@ def add_opts(
     return wrapped
 
 
-# def get_lock(session: Session, lock: bool, global_lock: bool = False) -> bool:
-#     return (
-#         lock
-#         or (not is_conda_session(session) and global_lock)
-#     )
-
-
 # * Environments------------------------------------------------------------------------
 # ** Dev (conda)
 @add_opts

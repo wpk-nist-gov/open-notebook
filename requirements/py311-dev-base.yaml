@@ -18,7 +18,6 @@ dependencies:
   - pytest-cov
   - pytest-sugar
   - pytest-xdist
-  - setuptools-scm>=8.0
   - tomli
   - typing-extensions
   - pip
