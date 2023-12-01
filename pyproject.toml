@@ -64,7 +64,6 @@ dev = [
 tools = [
     "pre-commit", #
     "scriv", # p2c: -p
-    # "nbqa",
     "pyright",
     "conda-lock",
 ]
