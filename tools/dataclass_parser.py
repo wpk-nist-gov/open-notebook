@@ -71,12 +71,6 @@ UNDEFINED = cast(
     type("Undefined", (), {"__repr__": lambda self: "UNDEFINED"})(),  # pyright: ignore
 )
 
-# @dataclass
-# class Parser(DataclassParser):
-#     flag0: bool = False # --flag0 will lead to True value
-#     flag1: Annotated[bool, Option(flags=help="another flag")] = False # --flag1 will lead to true with help
-#     flag2: bool = add_option()
-
 
 @dataclass
 class Option:
