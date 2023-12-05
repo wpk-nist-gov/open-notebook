@@ -252,3 +252,12 @@ def test_run(example_path: Path) -> None:
 
         assert out.returncode == 0
         assert out.stdout.decode().strip() == f"open-notebook, {__version__}"
+
+
+def test_main(example_path: Path) -> None:
+    from subprocess import check_call
+    import shlex
+
+    out = check_call(shlex.split("python -m open_notebook --help"))
+
+    assert out == 0

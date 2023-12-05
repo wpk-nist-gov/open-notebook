@@ -154,7 +154,7 @@ testpaths = ["tests", "README.md"]
 
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:", "@overload"]
-omit = ["*/vendored/*"]
+omit = ["*/vendored/*", "*/_typing.py"]
 include = ["src/*"]
 
 [tool.isort]
