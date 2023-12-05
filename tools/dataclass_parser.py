@@ -39,21 +39,29 @@ from dataclasses import (
     is_dataclass,
     replace,
 )
-from typing import Any, Callable, Container, Literal, Sequence, Union, cast
 
 assert sys.version_info >= (3, 10)
 
-# if sys.version_info < (3, 10):  # pragma: no cover
-#     from typing_extensions import Annotated, get_args, get_origin, get_type_hints
-# else:
-#     from typing import Annotated, get_args, get_origin, get_type_hints
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Callable,
+    Container,
+    Literal,
+    Sequence,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
-from typing import Annotated, get_args, get_origin, get_type_hints
-
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
+if TYPE_CHECKING:
+    if sys.version_info < (3, 11):
+        from typing_extensions import Self
+    else:
+        from typing import Self
 
 
 _NoneType = type(None)
