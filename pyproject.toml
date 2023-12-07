@@ -32,8 +32,8 @@ dependencies = [
 ]
 
 [project.urls]
-homepage = "https://github.com/usnistgov/open-notebook"
-documentation = "https://pages.nist.gov/open-notebook/"
+Homepage = "https://github.com/usnistgov/open-notebook"
+Documentation = "https://pages.nist.gov/open-notebook/"
 
 [project.optional-dependencies]
 test = [
@@ -46,6 +46,8 @@ dev-extras = [
     "pytest-accept", # p2c: -p
     "ipython",
     "ipykernel",
+    "nox",
+    "ruamel.yaml",
 ]
 typing-extras = [
     "pytype; python_version < '3.11'", #
@@ -55,7 +57,6 @@ typing = [
     "open-notebook[typing-extras]", #
     "pytest",
 ]
-nox = ["nox", "ruamel.yaml"]
 dev = [
     "open-notebook[test]", #
     "open-notebook[typing-extras]",
@@ -68,9 +69,8 @@ tools = [
     "conda-lock",
 ]
 dev-complete = [
-    "open-notebook[dev,nox,tools]", #
+    "open-notebook[dev]", #
     "open-notebook[tools]",
-    "open-notebook[nox]",
 ]
 docs = [
     "ipython", #
@@ -101,9 +101,6 @@ default_envs = ["test", "typing", "docs", "dev", "dev-complete"]
 extras = ["test"]
 base = false
 
-[tool.pyproject2conda.envs.dev-base]
-extras = ["dev"]
-
 [tool.pyproject2conda.envs.build]
 extras = "build-system.requires"
 reqs = ["build"]
@@ -113,7 +110,7 @@ style = "requirements"
 # make sure pip available to all conda environments
 # that install the package
 [[tool.pyproject2conda.overrides]]
-envs = ["test", "dev", "dev-complete", "dev-base", "docs"]
+envs = ["test", "docs", "dev", "dev-complete"]
 deps = ["pip"]
 
 [[tool.pyproject2conda.overrides]]

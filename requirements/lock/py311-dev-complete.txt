@@ -41,7 +41,7 @@ click-log==0.4.0
     # via scriv
 clikit==0.6.2
     # via conda-lock
-colorlog==6.7.0
+colorlog==6.8.0
     # via nox
 comm==0.2.0
     # via ipykernel
@@ -78,11 +78,11 @@ gitpython==3.1.40
     # via conda-lock
 html5lib==1.1
     # via conda-lock
-identify==2.5.32
+identify==2.5.33
     # via pre-commit
 idna==3.6
     # via requests
-importlib-metadata==6.8.0
+importlib-metadata==7.0.0
     # via keyring
 iniconfig==2.0.0
     # via pytest
@@ -149,7 +149,7 @@ pexpect==4.9.0
     # via ipython
 pkginfo==1.9.6
     # via conda-lock
-platformdirs==4.0.0
+platformdirs==4.1.0
     # via
     #   jupyter-core
     #   virtualenv
@@ -173,7 +173,7 @@ pygments==2.17.2
     # via ipython
 pylev==1.4.0
     # via clikit
-pyright==1.1.338
+pyright==1.1.339
     # via -r ./requirements/dev-complete.txt
 pytest==7.4.3
     # via
@@ -196,7 +196,7 @@ pyyaml==6.0.1
     # via
     #   conda-lock
     #   pre-commit
-pyzmq==25.1.1
+pyzmq==25.1.2
     # via
     #   ipykernel
     #   jupyter-client
@@ -223,7 +223,7 @@ smmap==5.0.1
     # via gitdb
 stack-data==0.6.3
     # via ipython
-termcolor==2.3.0
+termcolor==2.4.0
     # via pytest-sugar
 tomli==2.0.1
     # via -r ./requirements/dev-complete.txt
@@ -254,7 +254,7 @@ urllib3==1.26.18
     # via
     #   conda-lock
     #   requests
-virtualenv==20.24.7
+virtualenv==20.25.0
     # via
     #   conda-lock
     #   nox

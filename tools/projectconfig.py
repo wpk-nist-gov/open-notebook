@@ -96,6 +96,23 @@ class ProjectConfig:
         else:
             return cls()
 
+    @classmethod
+    def from_path_and_environ(
+        cls, path: str | Path = "./config/userconfig.toml"
+    ) -> Self:
+        def _get_python_paths_from_environ() -> list[str]:
+            if python_paths_environ := os.environ.get("NOX_PYTHON_PATH"):
+                return python_paths_environ.split(":")
+            else:
+                return []
+
+        python_paths, env_extras = cls._path_to_params(path)
+
+        return cls(
+            python_paths=(python_paths or _get_python_paths_from_environ()),
+            env_extras=env_extras,
+        )
+
     @staticmethod
     def _params_to_string(
         python_paths: list[str], env_extras: dict[str, Mapping[str, Any]]

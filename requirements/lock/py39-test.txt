@@ -32,7 +32,7 @@ pytest-sugar==0.9.7
     # via -r ./requirements/test.txt
 pytest-xdist==3.5.0
     # via -r ./requirements/test.txt
-termcolor==2.3.0
+termcolor==2.4.0
     # via pytest-sugar
 tomli==2.0.1
     # via

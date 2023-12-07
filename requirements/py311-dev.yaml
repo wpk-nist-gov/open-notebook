@@ -14,10 +14,12 @@ dependencies:
   - ipykernel
   - ipython
   - mypy>=1.4.1
+  - nox
   - pytest
   - pytest-cov
   - pytest-sugar
   - pytest-xdist
+  - ruamel.yaml
   - tomli
   - typing-extensions
   - pip
