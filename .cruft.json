@@ -1,6 +1,6 @@
 {
   "template": "https://github.com/wpk-nist-gov/cookiecutter-nist-python.git",
-  "commit": "3063ba13ec3555974c2b45edfe1b893512aa36c7",
+  "commit": "b803b5a57287f5839a36d7b5ad0874ff8a738924",
   "checkout": "feature/update-dev-envs-format",
   "context": {
     "cookiecutter": {
@@ -18,7 +18,7 @@
       "year": "2023",
       "__answers": "",
       "_copy_without_render": [],
-      "_template": "https://github.com/usnistgov/cookiecutter-nist-python.git"
+      "_template": "https://github.com/wpk-nist-gov/cookiecutter-nist-python.git"
     }
   },
   "directory": null
