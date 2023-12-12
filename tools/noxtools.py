@@ -272,7 +272,10 @@ class Installer:
     @cached_property
     def skip_install(self) -> bool:
         try:
-            return self.session._runner.global_config.no_install and self.session._runner.venv._reused  # type: ignore
+            return (
+                self.session._runner.global_config.no_install
+                and self.session._runner.venv._reused
+            )  # type: ignore
         except Exception:
             return False
 
@@ -596,7 +599,9 @@ class Installer:
                 assert isinstance(
                     envname, str
                 ), "Must supply conda_lock_path or envname"
-                conda_lock_path = infer_requirement_path(envname, ext=".yaml", python_version=session.python, lock=lock)  # type: ignore
+                conda_lock_path = infer_requirement_path(
+                    envname, ext=".yaml", python_version=session.python, lock=lock
+                )  # type: ignore
 
             return cls(
                 session=session, lock=lock, conda_lock_path=conda_lock_path, **kwargs

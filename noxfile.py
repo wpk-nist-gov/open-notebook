@@ -260,7 +260,7 @@ def parse_posargs(*posargs: str) -> SessionParams:
 
 
 def add_opts(
-    func: Callable[[Session, SessionParams], None]
+    func: Callable[[Session, SessionParams], None],
 ) -> Callable[[Session], None]:
     @wraps(func)
     def wrapped(session: Session) -> None:
@@ -307,7 +307,7 @@ def bootstrap(session: Session, opts: SessionParams) -> None:
     """Run config, reqs, and dev"""
     session.install("nox", "ruamel.yaml")
 
-    cmds = opts.bootstrap or ["config", "requirements", "dev"]
+    cmds = opts.bootstrap or ["requirements", "dev"]
 
     for c in cmds:
         session.run("nox", "-s", c, "--", *session.posargs)
