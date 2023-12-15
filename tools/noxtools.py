@@ -3,13 +3,47 @@ from __future__ import annotations
 
 import os
 import shlex
+from contextlib import contextmanager
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+# fmt: off
+from nox.sessions import SessionRunner
+
+# Override SessionRunner._create_venv
+_create_venv_super = SessionRunner._create_venv
+
+def override_sessionrunner_create_venv(self) -> None:
+    """Override SessionRunner._create_venv"""
+
+    if callable(self.func.venv_backend):
+        # if passed a callable backend, always use just that
+        # i.e., don't override
+        logger.info("Using custom callable venv_backend")
+
+        self.venv = self.func.venv_backend(
+            location=self.envdir,
+            interpreter=self.func.python,
+            reuse_existing=self.func.reuse_venv or self.global_config.reuse_existing_virtualenvs,
+            venv_params=self.func.venv_params,
+            runner=self,
+        )
+        return
+    else:
+        logger.info("Using nox venv_backend")
+        return _create_venv_super(self)
+
+SessionRunner._create_venv = override_sessionrunner_create_venv
+# fmt: on
+
+import nox.command
+from nox.logger import logger
+from nox.virtualenv import CondaEnv
+
 if TYPE_CHECKING:
     import sys
-    from typing import Any, Iterable, TextIO, Union
+    from typing import Any, Callable, Iterable, Literal, TextIO, Union
 
     from nox import Session
 
@@ -19,6 +53,238 @@ if TYPE_CHECKING:
         from typing_extensions import Self
     else:
         from typing import Self
+
+
+class VenvBackend:
+    """Create a callable venv_backend."""
+
+    def __init__(
+        self,
+        parse_posargs: Callable[..., dict[str, Any]],
+        envname: str | None = None,
+        requirements: str | Path | None = None,
+        backend: Literal[
+            "conda", "mamba", "micromamba", "virtualenv", "venv"
+        ] = "conda",
+        lock_fallback: bool | None = None,
+    ) -> None:
+        self.envname = envname
+        self.backend = backend
+        self.parse_posargs = parse_posargs
+        self.lock_fallback = lock_fallback or self.is_conda()
+
+        self._requirements = requirements
+
+    def set_opts(self, *posargs: str) -> None:
+        self.opts: dict[str, Any] = self.parse_posargs(*posargs)
+
+    @property
+    def lock(self) -> bool:
+        return cast(bool, self.opts.get("lock", False))
+
+    @property
+    def update(self) -> bool:
+        return cast(bool, self.opts.get("update", False))
+
+    def is_conda(self):
+        return self.backend in {"conda", "mamba", "micromamba"}
+
+    def set_requirements(self, python_version: str | None) -> None:
+        if self._requirements is not None:
+            r = Path(self._requirements)
+        elif self.envname is None:
+            r = None
+        else:
+            if self.is_conda():
+                assert (
+                    python_version is not None
+                ), "Must pass python version for conda env"
+
+            r = Path(
+                infer_requirement_path(
+                    name=self.envname,
+                    python_version=python_version,
+                    ext=".yaml" if self.is_conda() else ".txt",
+                    lock=self.lock,
+                    lock_fallback=self.lock_fallback,
+                )
+            )
+
+        self.requirements = r
+
+    def set_tmp_path(self, location: str) -> None:
+        self.tmp_path = Path(location) / "tmp"
+
+    def set_params_from_runner(self, runner: SessionRunner) -> None:
+        self.set_opts(*runner.posargs)
+        self.set_requirements(python_version=runner.func.python)  # type: ignore
+        self.set_tmp_path(location=runner.envdir)
+
+    @property
+    def hash_path(self) -> Path:
+        if self.requirements is None:
+            raise ValueError("trying to use hash_path with no requirements")
+        return self.tmp_path / (self.requirements.name + ".hash.json")
+
+    @property
+    def config_path(self) -> Path:
+        return self.tmp_path / "env.json"
+
+    def create_conda_env(self, runner: SessionRunner, reuse_existing: bool) -> CondaEnv:
+        venv = CondaEnv(
+            location=runner.envdir,
+            interpreter=runner.func.python,  # type: ignore
+            reuse_existing=reuse_existing,
+            venv_params=runner.func.venv_params,
+            conda_cmd=self.backend.replace("micro", ""),
+        )
+        if not self.requirements:
+            venv.create()
+            return venv
+
+        create = venv._clean_location()
+
+        with check_for_change_manager(
+            self.requirements,
+            hash_path=self.hash_path,
+            force_write=create or self.update,
+        ) as changed:
+            if create:
+                cmds = ["create"]
+            elif changed or self.update:
+                # recreate
+                self.config_path.unlink(missing_ok=True)
+                cmds = ["update", "--prune"]
+            else:
+                # reuse
+                cmds = ["reuse"]
+                venv._reused = True
+
+            # create environment
+            cmd = cmds[0]
+            logger.info(f"{cmd.capitalize()} conda environment in {venv.location_name}")
+            if cmd != "reuse":
+                cmds = (
+                    [self.backend, "env"]
+                    # + ([] if self.backend == "micromamba" else ["env"])
+                    + cmds
+                    + [
+                        "--yes",
+                        "--prefix",
+                        venv.location,
+                        "--file",
+                        str(self.requirements),
+                    ]
+                )
+                if venv_params := runner.func.venv_params:
+                    cmds.extend(venv_params)
+
+                logger.info(" ".join(cmds))
+                nox.command.run(cmds, silent=False, log=nox.options.verbose or False)
+        return venv
+
+    # def create_virtualenv(self, runner: SessionRunner, reuse_existing: bool) -> VirtualEnv:
+    #     venv =
+
+    def __call__(
+        self,
+        location: str,
+        interpreter: str | None,
+        reuse_existing: bool,
+        venv_params: Any,
+        runner: SessionRunner,
+    ) -> CondaEnv:
+        self.set_params_from_runner(runner)
+
+        if self.is_conda():
+            return self.create_conda_env(runner=runner, reuse_existing=reuse_existing)
+        else:
+            raise ValueError
+
+
+def conda_venv_backend(
+    location: str,
+    interpreter: str | None,
+    reuse_existing: bool,
+    venv_params: Any,
+    runner: SessionRunner,
+) -> CondaEnv:
+    """
+    Custom venv_backend to create conda environment from `environment.yaml` file.
+
+    venv_params should be a dict with following keys:
+
+    * 'envname' : "name" of environment
+    * 'parse_posargs' :  parse_posargs(*posargs) -> dict[str, Any].
+    * 'conda_backend' : {"mamba", "conda"}
+    * 'lock_fallback' : bool (whether to lock_fallback to non-locked)
+
+    Sets `env_file = requirements/py{py}-{envname}`.
+
+    The environment is cached to `location/tmp/{env_file}.hash.json`
+    """
+    if not interpreter:
+        raise ValueError("must supply interpreter for this backend")
+
+    # get envname, parse_posargs, lock_fallback, and venv_params
+    assert isinstance(venv_params, dict)
+    assert (envname := venv_params.get("envname")) is not None
+    assert (parse_posargs := venv_params.get("parse_posargs")) and callable(
+        parse_posargs
+    )
+    assert isinstance(lock_fallback := venv_params.get("lock_fallback", True), bool)
+    assert (conda_backend := venv_params.get("conda_backend", "conda")) in {
+        "mamba",
+        "conda",
+    }
+
+    # options
+    opts = cast("dict[str, Any]", parse_posargs(*runner.posargs))
+
+    venv = CondaEnv(
+        location=location,
+        interpreter=interpreter,
+        reuse_existing=reuse_existing,
+        venv_params=venv_params.get("venv_params"),
+    )
+
+    env_file = infer_requirement_path(
+        name=envname,
+        ext=".yaml",
+        python_version=interpreter,
+        lock=opts.get("lock", False),
+        lock_fallback=lock_fallback,
+    )
+
+    # hash of env_file
+    tmp_path = Path(location) / "tmp"
+    hash_path = tmp_path / (Path(env_file).name + ".hash.json")
+    changed, hashes, _ = check_hash_path_for_change(env_file, hash_path=hash_path)
+
+    # Custom creating (based on CondaEnv.create)
+    if not venv._clean_location():
+        if changed or opts.get("update", False):
+            # remove "env.json" if it exists:
+            if (p := tmp_path / "env.json").is_file():
+                p.unlink()
+            cmd, extras = "update", "--prune"
+        else:
+            cmd, extras = "reuse", ""
+            venv._reused = True
+    else:
+        cmd, extras = "create", ""
+
+    # create environment
+    logger.info(f"{cmd.capitalize()} conda environment in {venv.location_name}")
+    if cmd != "reuse":
+        cmd = f"{conda_backend} env {cmd} --prefix {venv.location} --file {env_file} {extras}"
+        logger.info(cmd)
+        nox.command.run(shlex.split(cmd), silent=True, log=nox.options.verbose or False)
+
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    write_hashes(hash_path, hashes)
+
+    return venv
 
 
 # * Top level installation functions ---------------------------------------------------
@@ -54,8 +320,31 @@ def infer_requirement_path(
     python_version: str | None = None,
     lock: bool = False,
     check_exists: bool = True,
+    lock_fallback: bool = False,
 ) -> str:
     """Get filename for a conda yaml or pip requirements file."""
+
+    if lock_fallback:
+        try:
+            return infer_requirement_path(
+                name=name,
+                ext=ext,
+                python_version=python_version,
+                lock=lock,
+                check_exists=True,
+                lock_fallback=False,
+            )
+        except FileNotFoundError:
+            logger.info("Falling back to non-locked")
+            return infer_requirement_path(
+                name=name,
+                ext=ext,
+                python_version=python_version,
+                lock=False,
+                check_exists=True,
+                lock_fallback=False,
+            )
+
     if name is None:
         raise ValueError("must supply name")
 
@@ -83,7 +372,8 @@ def infer_requirement_path(
         filename = f"./requirements/{filename}"
 
     if check_exists:
-        assert Path(filename).is_file(), f"{filename} does not exist."
+        if not Path(filename).is_file():
+            raise FileNotFoundError(f"{filename} does not exist")
 
     return filename
 
@@ -93,6 +383,7 @@ def _infer_requirement_paths(
     lock: bool = False,
     ext: str | None = None,
     python_version: str | None = None,
+    lock_fallback: bool = False,
 ) -> list[str]:
     if names is None:
         return []
@@ -100,7 +391,13 @@ def _infer_requirement_paths(
         names = [names]
 
     return [
-        infer_requirement_path(name, lock=lock, ext=ext, python_version=python_version)
+        infer_requirement_path(
+            name,
+            lock=lock,
+            ext=ext,
+            python_version=python_version,
+            lock_fallback=lock_fallback,
+        )
         for name in names
     ]
 
@@ -112,8 +409,6 @@ def is_conda_session(session: Session) -> bool:
 
 
 # * Main class ----------------------------------------------------------------
-
-
 class Installer:
     """
     Class to handle installing package/dependecies
@@ -549,13 +844,18 @@ class Installer:
         session: Session,
         envname: str | Iterable[str] | None = None,
         lock: bool = False,
+        lock_fallback: bool = False,
         requirements: PathLike | Iterable[PathLike] | None = None,
         **kwargs: Any,
     ) -> Self:
         if lock:
             assert isinstance(session.python, str)
             requirements = _verify_paths(requirements) + _infer_requirement_paths(
-                envname, ext=".txt", lock=lock, python_version=session.python
+                envname,
+                ext=".txt",
+                lock=lock,
+                python_version=session.python,
+                lock_fallback=lock_fallback,
             )
 
         else:
@@ -577,6 +877,7 @@ class Installer:
         session: Session,
         envname: str | Iterable[str] | None = None,
         lock: bool = False,
+        lock_fallback: bool = True,
         conda_lock_path: PathLike | None = None,
         **kwargs: Any,
     ) -> Self:
@@ -596,7 +897,7 @@ class Installer:
                 assert isinstance(
                     envname, str
                 ), "Must supply conda_lock_path or envname"
-                conda_lock_path = infer_requirement_path(envname, ext=".yaml", python_version=session.python, lock=lock)  # type: ignore
+                conda_lock_path = infer_requirement_path(envname, ext=".yaml", python_version=session.python, lock=lock, lock_fallback=lock_fallback)  # type: ignore
 
             return cls(
                 session=session, lock=lock, conda_lock_path=conda_lock_path, **kwargs
@@ -611,38 +912,46 @@ class Installer:
         session: Session,
         envname: str | Iterable[str] | None = None,
         lock: bool = False,
-        fallback: bool | None = None,
+        lock_fallback: bool | None = None,
         **kwargs: Any,
     ) -> Self:
-        if fallback is None:
-            fallback = is_conda_session(session)
+        if lock_fallback is None:
+            lock_fallback = is_conda_session(session)
 
-        if fallback and lock:
-            try:
-                return cls.from_envname(
-                    session=session,
-                    envname=envname,
-                    lock=lock,
-                    fallback=False,
-                    **kwargs,
-                )
-            except Exception:
-                session.log("Falling back to non-locked")
-                return cls.from_envname(
-                    session=session,
-                    envname=envname,
-                    lock=False,
-                    fallback=False,
-                    **kwargs,
-                )
+        # if lock_fallback and lock:
+        #     try:
+        #         return cls.from_envname(
+        #             session=session,
+        #             envname=envname,
+        #             lock=lock,
+        #             lock_fallback=False,
+        #             **kwargs,
+        #         )
+        #     except Exception:
+        #         session.log("Falling back to non-locked")
+        #         return cls.from_envname(
+        #             session=session,
+        #             envname=envname,
+        #             lock=False,
+        #             lock_fallback=False,
+        #             **kwargs,
+        #         )
 
-        elif is_conda_session(session):
+        if is_conda_session(session):
             return cls._from_envname_conda(
-                session=session, envname=envname, lock=lock, **kwargs
+                session=session,
+                envname=envname,
+                lock=lock,
+                lock_fallback=lock_fallback,
+                **kwargs,
             )
         else:
             return cls._from_envname_pip(
-                session=session, envname=envname, lock=lock, **kwargs
+                session=session,
+                envname=envname,
+                lock=lock,
+                lock_fallback=lock_fallback,
+                **kwargs,
             )
 
 
@@ -745,28 +1054,90 @@ def _get_file_hash(path: str | Path, buff_size: int = 65536) -> str:
     return md5.hexdigest()
 
 
+@contextmanager
+def check_for_change_manager(
+    *deps: str | Path,
+    hash_path: str | Path | None = None,
+    target_path: str | Path | None = None,
+    force_write: bool = False,
+):
+    """
+    Context manager to look for changes in dependencies.
+
+    Yields
+    ------
+    changed: bool
+
+    If exit normaly, write hashes to hash_path file
+    """
+
+    try:
+        changed, hashes, hash_path = check_hash_path_for_change(
+            *deps, target_path=target_path, hash_path=hash_path
+        )
+
+        yield changed
+
+    except Exception as e:
+        raise e
+
+    else:
+        if force_write or changed:
+            logger.info(f"Writing {hash_path}")
+
+            # make sure the parent directory exists:
+            hash_path.parent.mkdir(parents=True, exist_ok=True)
+            write_hashes(hash_path=hash_path, hashes=hashes)
+
+
 def check_hash_path_for_change(
-    target: str | Path, *deps: str | Path, hash_path: str | Path | None = None
-) -> tuple[bool, Path, dict[str, Any]]:
+    *deps: str | Path,
+    target_path: str | Path | None = None,
+    hash_path: str | Path | None = None,
+) -> tuple[bool, dict[str, str], Path]:
     """
     Checks a json file `hash_path` for hashes of `other_paths`.
 
-    If there is a change, return True.
-    If no change, return False.
+    if specify target_path and no hash_path, set `hash_path=target_path.parent / (target_path.name + ".hash.json")`.
+    if specify hash_path and no target, set
+
+    Parameters
+    ----------
+    *deps :
+        files on which target_path/hash_path depends.
+    hash_path :
+        Path of file containing hashes of `deps`.
+    target_path :
+        Target file (i.e., the final file to be created).
+        Defaults to hash_path.
+
+
+    Returns
+    -------
+    changed : bool
+    hashes : dict[str, str]
+    hash_path : Path
+
     """
     import json
 
-    target = Path(target)
-    if hash_path is None:
-        hash_path = target.parent / (target.name + ".hash.json")
+    msg = "Must specify target_path or hash_path"
+
+    if target_path is None:
+        assert hash_path is not None, msg
+        target_path = hash_path = Path(hash_path)
     else:
-        hash_path = Path(hash_path)
+        target_path = Path(target_path)
+        if hash_path is None:
+            hash_path = target_path.parent / (target_path.name + ".hash.json")
+        else:
+            hash_path = Path(hash_path)
 
     hashes: dict[str, str] = {
         os.path.relpath(k, hash_path.parent): _get_file_hash(k) for k in deps
     }
 
-    if not target.is_file():
+    if not target_path.is_file():
         changed = True
 
     elif hash_path.is_file():
@@ -784,7 +1155,7 @@ def check_hash_path_for_change(
     else:
         changed = True
 
-    return changed, hash_path, hashes
+    return changed, hashes, hash_path
 
 
 def write_hashes(hash_path: str | Path, hashes: dict[str, Any]) -> None:

@@ -86,6 +86,7 @@ docs = [
     "autodocsumm",
     "sphinx-argparse",
 ]
+thing = []
 
 [tool.pyproject2conda]
 user_config = "config/userconfig.toml"
@@ -95,7 +96,7 @@ template = "requirements/{env}"
 python = ["3.11"]
 channels = ["conda-forge"]
 style = ["yaml", "requirements"]
-default_envs = ["test", "typing", "docs", "dev", "dev-complete"]
+default_envs = ["test", "typing", "docs", "dev", "dev-complete", "thing"]
 
 [tool.pyproject2conda.envs.test-extras]
 extras = ["test"]

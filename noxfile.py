@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Annotated,
+    Any,
     Callable,
     Iterator,
     Literal,
@@ -22,16 +23,15 @@ from typing import (
     TypedDict,
 )
 
-import nox  # type: ignore[unused-ignore,import]
-from nox import Session
-
 # fmt: off
 sys.path.insert(0, ".")
-
 from tools.dataclass_parser import DataclassParser, add_option, option
 from tools.noxtools import (
     Installer,
-    check_hash_path_for_change,
+    VenvBackend,
+    # check_hash_path_for_change,
+    # write_hashes,
+    check_for_change_manager,
     combine_list_str,
     infer_requirement_path,
     is_conda_session,
@@ -40,11 +40,19 @@ from tools.noxtools import (
     prepend_flag,
     session_run_commands,
     update_target,
-    write_hashes,
 )
 
 sys.path.pop(0)
+
+# make sure these afeter
+import nox  # type: ignore[unused-ignore,import]
+from nox import Session
+
 # fmt: on
+
+# if TYPE_CHECKING:
+#     from nox.sessions import SessionRunner
+#     from nox.virtualenv import CondaEnv
 
 
 # * Names ------------------------------------------------------------------------------
@@ -270,8 +278,39 @@ def add_opts(
     return wrapped
 
 
+def parse_posargs_to_params(*posargs: str) -> dict[str, Any]:
+    """
+    Callback function to parse posargs and return a dictionary.
+
+    To be used with callable venv_backnd.  Should include:
+
+    * update
+    * lock
+
+    """
+    from dataclasses import asdict
+
+    return asdict(parse_posargs(*posargs))
+
+
 # * Environments------------------------------------------------------------------------
 # ** Dev (conda)
+@nox.session(
+    venv_backend=VenvBackend(
+        envname="thing", backend="micromamba", parse_posargs=parse_posargs_to_params
+    ),
+    python=PYTHON_DEFAULT_VERSION,
+)
+@add_opts
+def example(
+    session: Session,
+    opts: SessionParams,
+) -> None:
+    Installer(session=session, package=".", update=opts.update).install_all(
+        update_package=opts.update_package
+    )
+
+
 @add_opts
 def dev(
     session: Session,
@@ -420,23 +459,25 @@ def conda_lock(
                 return
 
         # check hashes
-        changed, hash_path, hashes = check_hash_path_for_change(lockfile, *deps)
-        if opts.conda_lock_force or changed:
-            session.log(f"Creating {lockfile}")
-            # insert -f for each arg
-            if lockfile.exists():
-                lockfile.unlink()
-            session.run(
-                "conda-lock",
-                "--mamba" if opts.conda_lock_mamba else "--no-mamba",
-                *prepend_flag("-c", *channel),
-                *prepend_flag("-p", *platform),
-                *prepend_flag("-f", *deps),
-                f"--lockfile={lockfile}",
-            )
-            write_hashes(hash_path, hashes)
-        else:
-            session.log(f"Skipping {lockfile} (exists)")
+
+        with check_for_change_manager(
+            *deps, target_path=lockfile, force_write=opts.conda_lock_force
+        ) as changed:
+            if opts.conda_lock_force or changed:
+                session.log(f"Creating {lockfile}")
+                # insert -f for each arg
+                if lockfile.exists():
+                    lockfile.unlink()
+                session.run(
+                    "conda-lock",
+                    "--mamba" if opts.conda_lock_mamba else "--no-mamba",
+                    *prepend_flag("-c", *channel),
+                    *prepend_flag("-p", *platform),
+                    *prepend_flag("-f", *deps),
+                    f"--lockfile={lockfile}",
+                )
+            else:
+                session.log(f"Skipping {lockfile} (exists)")
 
     session_run_commands(session, opts.conda_lock_run)
     for path in (ROOT / "requirements").relative_to(ROOT.cwd()).glob("py*.yaml"):
@@ -462,7 +503,7 @@ def pip_compile(
     force = (
         opts.pip_compile_force
         or opts.pip_compile_upgrade
-        or opts.pip_compile_upgrade_package
+        or bool(opts.pip_compile_upgrade_package)
     )
 
     if opts.pip_compile_upgrade:
@@ -490,15 +531,15 @@ def pip_compile(
             check_exists=False,
         )
 
-        changed, hash_path, hashes = check_hash_path_for_change(lockpath, reqspath)
-        if force or changed:
-            session.log(f"Creating {lockpath}")
-            session.run("pip-compile", *options, "-o", lockpath, reqspath)
+        with check_for_change_manager(
+            reqspath, target_path=lockpath, force_write=force
+        ) as changed:
+            if force or changed:
+                session.log(f"Creating {lockpath}")
+                session.run("pip-compile", *options, "-o", lockpath, reqspath)
 
-            write_hashes(hash_path, hashes)
-
-        else:
-            session.log(f"Skipping {lockpath}")
+            else:
+                session.log(f"Skipping {lockpath}")
 
 
 # ** testing
