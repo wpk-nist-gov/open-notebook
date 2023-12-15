@@ -14,7 +14,7 @@ from nox.sessions import SessionRunner
 # Override SessionRunner._create_venv
 _create_venv_super = SessionRunner._create_venv
 
-def override_sessionrunner_create_venv(self) -> None:
+def override_sessionrunner_create_venv(self) -> None:  # type: ignore
     """Override SessionRunner._create_venv"""
 
     if callable(self.func.venv_backend):
@@ -34,7 +34,7 @@ def override_sessionrunner_create_venv(self) -> None:
         logger.info("Using nox venv_backend")
         return _create_venv_super(self)
 
-SessionRunner._create_venv = override_sessionrunner_create_venv
+SessionRunner._create_venv = override_sessionrunner_create_venv  # type: ignore
 # fmt: on
 
 import nox.command
@@ -86,7 +86,7 @@ class VenvBackend:
     def update(self) -> bool:
         return cast(bool, self.opts.get("update", False))
 
-    def is_conda(self):
+    def is_conda(self) -> bool:
         return self.backend in {"conda", "mamba", "micromamba"}
 
     def set_requirements(self, python_version: str | None) -> None:
@@ -183,9 +183,6 @@ class VenvBackend:
                 nox.command.run(cmds, silent=False, log=nox.options.verbose or False)
         return venv
 
-    # def create_virtualenv(self, runner: SessionRunner, reuse_existing: bool) -> VirtualEnv:
-    #     venv =
-
     def __call__(
         self,
         location: str,
@@ -200,6 +197,29 @@ class VenvBackend:
             return self.create_conda_env(runner=runner, reuse_existing=reuse_existing)
         else:
             raise ValueError
+
+
+def factory_conda_backend(
+    backend: Literal["conda", "mamba", "micromamba"] = "conda"
+) -> Callable[..., CondaEnv]:
+    def passthrough_venv_backend(
+        location: str,
+        interpreter: str | None,
+        reuse_existing: bool,
+        venv_params: Any,
+        runner: SessionRunner,
+    ) -> CondaEnv:
+        CondaEnv.allowed_globals = ("conda", "mamba", "micromamba", "conda-lock")
+
+        return CondaEnv(
+            location=location,
+            interpreter=interpreter,
+            reuse_existing=reuse_existing,
+            venv_params=venv_params,
+            conda_cmd=backend,
+        )
+
+    return passthrough_venv_backend
 
 
 def conda_venv_backend(
@@ -446,7 +466,8 @@ class Installer:
         config_path: PathLike | None = None,
         # conda specific things:
         conda_deps: str | Iterable[str] | None = None,
-        conda_lock_path: PathLike | None = None,
+        conda_yaml: PathLike | None = None,
+        create_venv: bool = False,
         channels: str | Iterable[str] | None = None,
     ) -> None:
         self.session = session
@@ -474,21 +495,30 @@ class Installer:
         self.conda_deps: list[str] = sorted(_remove_whitespace_list(conda_deps or []))
         self.channels: list[str] = sorted(_remove_whitespace_list(channels or []))
 
-        if not self.is_conda_session:
-            if self.conda_deps or self.channels or conda_lock_path:
+        if conda_yaml is not None:
+            conda_yaml = _verify_path(conda_yaml)
+        self.conda_yaml = conda_yaml
+
+        if create_venv is None:
+            create_venv = self.is_conda_session()
+        self.create_venv = create_venv
+
+        # checks for for lock files
+        if not self.is_conda_session():
+            if self.conda_deps or self.channels or self.conda_yaml:
                 raise ValueError("passing conda parameters to non conda session")
 
         if self.lock:
-            if not self.is_conda_session:
+            if not self.is_conda_session():
                 if (not self.requirements) or self.pip_deps or self.constraints:
                     raise ValueError("Can only pass requirements for locked virtualenv")
 
             else:
-                if conda_lock_path is None:
-                    raise ValueError("Must pass conda_lock_path")
+                if self.conda_yaml is None:
+                    raise ValueError("Must pass `conda_yaml=conda-lock-file`")
                 elif (
                     self.conda_deps
-                    or self.channels
+                    or self.channel
                     or self.pip_deps
                     or self.requirements
                     or self.constraints
@@ -496,10 +526,6 @@ class Installer:
                     raise ValueError(
                         "Can not pass conda_deps, channels, pip_deps, requirements, constraints if using conda-lock"
                     )
-
-                conda_lock_path = _verify_path(conda_lock_path)
-
-        self.conda_lock_path = conda_lock_path
 
     @cached_property
     def config(self) -> dict[str, Any]:
@@ -512,7 +538,7 @@ class Installer:
                 out[k] = v
 
         # file hashses
-        for k in ["requirements", "constraints", "conda_lock_path"]:
+        for k in ["requirements", "constraints", "conda_yaml"]:
             if v := getattr(self, k):
                 if isinstance(v, str):
                     v = [v]
@@ -538,7 +564,7 @@ class Installer:
         with logfile.open("w") as f:
             self.session.run("python", "--version", stdout=f)
 
-            if self.is_conda_session:
+            if self.is_conda_session():
                 self.session.run("conda", "list", stdout=f, external=True)
             else:
                 self.session.run("pip", "list", stdout=f)
@@ -560,7 +586,6 @@ class Installer:
     def python_version(self) -> str:
         return cast(str, self.session.python)
 
-    @cached_property
     def is_conda_session(self) -> bool:
         return is_conda_session(self.session)
 
@@ -580,16 +605,6 @@ class Installer:
 
         return out
 
-        # if (out := self.config != self.previous_config):
-        #     for k in (self.config.keys() | self.previous_config.keys()):
-        #         current = self.config.get(k, None)
-        #         previous = self.previous_config.get(k, None)
-
-        #         if current != previous:
-        #             print(self.session.log(f"{k} current : {current}"))
-        #             print(self.session.log(f"{k} previous: {previous}"))
-        # return out
-
     # Smart runners
     def run_commands(
         self,
@@ -608,7 +623,7 @@ class Installer:
         display_name: str | None = None,
         update: bool = False,
     ) -> Self:
-        if not display_name or (not self.is_conda_session) or self.skip_install:
+        if not display_name or (not self.is_conda_session()) or self.skip_install:
             pass
         elif self.changed or update or self.update:
             command = f"python -m ipykernel install --sys-prefix --display-name {display_name}".split()
@@ -635,8 +650,12 @@ class Installer:
         save_config: bool = True,
         display_name: str | None = None,
     ) -> Self:
+        if self.create_venv:
+            assert self.is_conda_session()
+            self.create_conda_env()
+
         out = (
-            (self.conda_install_deps() if self.is_conda_session else self)
+            (self.conda_install_deps() if self.is_conda_session() else self)
             .pip_install_deps()
             .pip_install_package(update=update_package)
             .set_ipykernel_display_name(display_name=display_name)
@@ -706,6 +725,71 @@ class Installer:
                 if opts:
                     install_args.extend(combine_list_str(opts))
                 self.session.install(*install_args, *args, **kwargs)
+
+        return self
+
+    def _create_style(
+        self, update: bool = False
+    ) -> Literal["create", "update", "reuse"]:
+        """Determine the type of venv creation"""
+        venv = self.session.virtualenv
+
+        assert isinstance(venv, CondaEnv)
+        if venv._clean_location():
+            return "create"
+        elif self.changed or update or self.update:
+            return "update"
+        else:
+            venv._reused = True
+            return "reuse"
+
+    def create_conda_env(self, update: bool = False) -> Self:
+        cmd = self._create_style(update=update)
+        cmds = [cmd]
+        if cmd == "update":
+            cmds.append("--prune")
+
+        venv = self.session.virtualenv
+        assert isinstance(venv, CondaEnv)
+
+        # create environment
+        self.session.log(
+            f"{cmd.capitalize()} conda environment in {venv.location_name}"
+        )
+
+        if cmd != "reuse":
+            extra_params = self.session._runner.func.venv_params or []
+
+            if self.lock and venv.conda_cmd != "micromamba":
+                # use conda-lock
+                if venv.conda_cmd == "conda":
+                    extra_params.append("--no-mamba")
+                else:
+                    extra_params.append("--mamba")
+
+                cmds = ["conda-lock", "install"] + extra_params + [str(self.conda_yaml)]
+            else:
+                cmds = (
+                    [venv.conda_cmd]
+                    + ([] if venv.conda_cmd == "micromamba" else ["env"])
+                    + cmds
+                    + (["--yes"] if venv.conda_cmd == "micromamba" else [])
+                    + [
+                        "--prefix",
+                        venv.location,
+                        "--file",
+                        str(self.conda_yaml),
+                    ]
+                    + extra_params
+                )
+
+            # Use safe tmpdir
+            # the temp directory may or may not exist
+            env = {"TMPDIR": tmpdir} if (tmpdir := os.environ.get("TMPDIR")) else {}
+            if cmd == "create":
+                self.session._run(*cmds, silent=True, env=env)
+            else:
+                self.session.run_always(*cmds, silent=True, env=env)
 
         return self
 
@@ -807,6 +891,7 @@ class Installer:
         cls,
         session: Session,
         envname: str | Iterable[str] | None = None,
+        conda_yaml: PathLike | None = None,
         paths: PathLike | Iterable[PathLike] | None = None,
         conda_deps: str | Iterable[str] | None = None,
         pip_deps: str | Iterable[str] | None = None,
@@ -839,7 +924,7 @@ class Installer:
         )
 
     @classmethod
-    def _from_envname_pip(
+    def from_envname_pip(
         cls,
         session: Session,
         envname: str | Iterable[str] | None = None,
@@ -872,13 +957,18 @@ class Installer:
         )
 
     @classmethod
-    def _from_envname_conda(
+    def from_envname_conda(
         cls,
         session: Session,
-        envname: str | Iterable[str] | None = None,
+        envname: str | None = None,
+        conda_yaml: PathLike | None = None,
         lock: bool = False,
         lock_fallback: bool = True,
-        conda_lock_path: PathLike | None = None,
+        conda_deps: str | Iterable[str] | None = None,
+        pip_deps: str | Iterable[str] | None = None,
+        channels: str | Iterable[str] | None = None,
+        package: str | None = None,
+        create_venv: bool | None = None,
         **kwargs: Any,
     ) -> Self:
         """
@@ -890,21 +980,31 @@ class Installer:
             `requirements/py{py}-dev.yaml` for `filename`
         """
 
-        if lock:
-            # get files from envname
+        if (envname is None) == (conda_yaml is None):
+            raise ValueError("Specify one of envname or conda_yaml")
 
-            if conda_lock_path is None:
-                assert isinstance(
-                    envname, str
-                ), "Must supply conda_lock_path or envname"
-                conda_lock_path = infer_requirement_path(envname, ext=".yaml", python_version=session.python, lock=lock, lock_fallback=lock_fallback)  # type: ignore
-
-            return cls(
-                session=session, lock=lock, conda_lock_path=conda_lock_path, **kwargs
+        elif envname:
+            conda_yaml = infer_requirement_path(
+                envname,
+                ext=".yaml",
+                python_version=session.python,
+                lock=lock,
+                lock_fallback=lock_fallback,
             )
-
         else:
-            return cls.from_yaml(session=session, envname=envname, lock=lock, **kwargs)
+            conda_yaml = _verify_path(conda_yaml)
+
+        return cls(
+            session=session,
+            lock=lock,
+            conda_yaml=conda_yaml,
+            conda_deps=conda_deps,
+            pip_deps=pip_deps,
+            channels=channels,
+            package=package,
+            create_venv=create_venv,
+            **kwargs,
+        )
 
     @classmethod
     def from_envname(
@@ -918,27 +1018,9 @@ class Installer:
         if lock_fallback is None:
             lock_fallback = is_conda_session(session)
 
-        # if lock_fallback and lock:
-        #     try:
-        #         return cls.from_envname(
-        #             session=session,
-        #             envname=envname,
-        #             lock=lock,
-        #             lock_fallback=False,
-        #             **kwargs,
-        #         )
-        #     except Exception:
-        #         session.log("Falling back to non-locked")
-        #         return cls.from_envname(
-        #             session=session,
-        #             envname=envname,
-        #             lock=False,
-        #             lock_fallback=False,
-        #             **kwargs,
-        #         )
-
         if is_conda_session(session):
-            return cls._from_envname_conda(
+            assert isinstance(envname, str) or envname is None
+            return cls.from_envname_conda(
                 session=session,
                 envname=envname,
                 lock=lock,
@@ -946,7 +1028,7 @@ class Installer:
                 **kwargs,
             )
         else:
-            return cls._from_envname_pip(
+            return cls.from_envname_pip(
                 session=session,
                 envname=envname,
                 lock=lock,

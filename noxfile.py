@@ -13,6 +13,7 @@ assert sys.version_info >= (3, 10)
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
     Callable,
@@ -33,6 +34,7 @@ from tools.noxtools import (
     # write_hashes,
     check_for_change_manager,
     combine_list_str,
+    factory_conda_backend,
     infer_requirement_path,
     is_conda_session,
     load_nox_config,
@@ -46,13 +48,12 @@ sys.path.pop(0)
 
 # make sure these afeter
 import nox  # type: ignore[unused-ignore,import]
-from nox import Session
 
 # fmt: on
 
-# if TYPE_CHECKING:
-#     from nox.sessions import SessionRunner
-#     from nox.virtualenv import CondaEnv
+if TYPE_CHECKING:
+    from nox import Session
+    from nox.virtualenv import CondaEnv
 
 
 # * Names ------------------------------------------------------------------------------
@@ -84,28 +85,28 @@ PYTHON_ALL_VERSIONS = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 PYTHON_DEFAULT_VERSION = "3.11"
 
 # conda/mamba
-if shutil.which("mamba"):
-    CONDA_BACKEND = "mamba"
-elif shutil.which("conda"):
-    CONDA_BACKEND = "conda"  # pyright: ignore
+for backend in ["mamba", "micromamba", "conda"]:
+    if shutil.which(backend):
+        CONDA_BACKEND: Literal["mamba", "micromamba", "conda"] = backend  # type: ignore
+        break
 else:
-    raise ValueError("neither conda or mamba found")
+    raise ValueError("no conda-like backend found")
 
 
 class SessionOptionsDict(TypedDict, total=False):
     """Dict for options to nox.session"""
 
     python: str | list[str]
-    venv_backend: str
+    venv_backend: str | Callable[..., CondaEnv]
 
 
 CONDA_DEFAULT_KWS: SessionOptionsDict = {
     "python": PYTHON_DEFAULT_VERSION,
-    "venv_backend": CONDA_BACKEND,
+    "venv_backend": factory_conda_backend(CONDA_BACKEND),
 }
 CONDA_ALL_KWS: SessionOptionsDict = {
     "python": PYTHON_ALL_VERSIONS,
-    "venv_backend": CONDA_BACKEND,
+    "venv_backend": factory_conda_backend(CONDA_BACKEND),
 }
 
 DEFAULT_KWS: SessionOptionsDict = {"python": PYTHON_DEFAULT_VERSION}
@@ -309,6 +310,17 @@ def example(
     Installer(session=session, package=".", update=opts.update).install_all(
         update_package=opts.update_package
     )
+
+
+@nox.session(**CONDA_DEFAULT_KWS)
+@add_opts
+def example2(
+    session: Session,
+    opts: SessionParams,
+) -> None:
+    Installer.from_envname(
+        session=session, envname="thing", package=".", update=opts.update
+    ).install_all(update_package=opts.update_package)
 
 
 @add_opts
