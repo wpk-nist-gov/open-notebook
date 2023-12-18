@@ -118,6 +118,10 @@ deps = ["pip"]
 envs = ["test", "typing", "test-extras"]
 python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
+[tool.pip-tools]
+allow-unsafe = true
+strip-extras = true
+
 [project.scripts]
 open-notebook = "open_notebook.cli:main"
 # alternative name
