@@ -1,6 +1,6 @@
 {
   "template": "https://github.com/wpk-nist-gov/cookiecutter-nist-python.git",
-  "commit": "b803b5a57287f5839a36d7b5ad0874ff8a738924",
+  "commit": "7ec49227e748bb205f30520fff4e3414294ebf14",
   "checkout": "feature/update-dev-envs-format",
   "context": {
     "cookiecutter": {

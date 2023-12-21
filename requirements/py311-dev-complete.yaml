@@ -16,6 +16,7 @@ dependencies:
   - ipython
   - mypy>=1.4.1
   - nox
+  - pip-tools
   - pre-commit
   - pyright
   - pytest

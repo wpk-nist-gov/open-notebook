@@ -196,7 +196,7 @@ docs-linkcheck: ## check links
 docs-build docs-release docs-clean docs-livehtml docs-linkcheck: requirements/docs.txt
 
 # ** typing
-.PHONY: typing-mypy typing-pyright typing-pytype typing-all typing-command
+.PHONY: typing-mypy typing-pyright typing-pytype typing-all
 typing-mypy: ## run mypy mypy_args=...
 	$(NOX) -s typing -- +m mypy
 typing-pyright: ## run pyright pyright_args=...
@@ -209,7 +209,6 @@ typing-mypy typing-pyright typing-pytype typing-all: requirements/typing.txt
 
 # ** dist pypi
 .PHONY: build testrelease release
-
 build: requirements/build.txt ## build dist
 	$(NOX) -s build
 testrelease: ## test release on testpypi
@@ -277,8 +276,8 @@ tuna-import: ## Analyze load time for module
 
 .PHONY: typing-tools
 typing-tools:
-	mypy noxfile.py tools
-	pyright noxfile.py tools
+	mypy noxfile.py tools/*.py
+	pyright noxfile.py tools/*.py
 
 .PHONY: cog-readme
 cog-readme: ## apply cog to README.md

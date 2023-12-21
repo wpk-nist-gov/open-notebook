@@ -144,11 +144,6 @@ class SessionParams(DataclassParser):
         default="dev",
     )
 
-    # bootstrap
-    bootstrap: list[str] | None = add_option(
-        "-B", "--bootstrap", help="run these sessions under isolated bootstrap session"
-    )
-
     # config
     dev_extras: OPT_TYPE = add_option(help="`extras` to include in dev environment")
     python_paths: OPT_TYPE = add_option(help="paths to python executables")
@@ -286,19 +281,6 @@ def add_opts(
 
 # * Environments------------------------------------------------------------------------
 # ** Dev (conda)
-@nox.session(**CONDA_DEFAULT_KWS)
-@add_opts
-def example(
-    session: Session,
-    opts: SessionParams,
-) -> None:
-    runner = Installer.from_envname(
-        session=session, envname="thing", package=True, update=opts.update
-    ).install_all(update_package=opts.update_package)
-
-    session.log(runner.python_full_path)
-
-
 @add_opts
 def dev(
     session: Session,
@@ -498,15 +480,22 @@ def pip_compile(
 
     envs_all = ["test", "typing"]
     envs_dev = ["dev", "dev-complete", "docs"]
+    envs_dev_optional = ["test-notebook"]
 
     if session.python == PYTHON_DEFAULT_VERSION:
-        envs = envs_all + envs_dev
+        envs = envs_all + envs_dev + envs_dev_optional
     else:
         envs = envs_all
 
     for env in envs:
         assert isinstance(session.python, str)
-        reqspath = infer_requirement_path(env, ext=".txt")
+        reqspath = infer_requirement_path(env, ext=".txt", check_exists=False)
+        if not reqspath.is_file():
+            if env in envs_dev_optional:
+                continue
+            else:
+                raise ValueError(f"Missing file {reqspath}")
+
         lockpath = infer_requirement_path(
             env,
             ext=".txt",

@@ -16,6 +16,8 @@ asttokens==2.4.1
     # via stack-data
 attrs==23.1.0
     # via scriv
+build==1.0.3
+    # via pip-tools
 cachecontrol==0.13.1
     # via
     #   cachecontrol
@@ -34,6 +36,7 @@ click==8.1.7
     #   click-log
     #   conda-lock
     #   ensureconda
+    #   pip-tools
     #   scriv
 click-default-group==1.2.4
     # via conda-lock
@@ -136,6 +139,7 @@ nox==2023.4.22
     # via -r requirements/dev-complete.txt
 packaging==23.2
     # via
+    #   build
     #   conda-lock
     #   ipykernel
     #   nox
@@ -147,6 +151,8 @@ pastel==0.2.1
     # via clikit
 pexpect==4.9.0
     # via ipython
+pip-tools==7.3.0
+    # via -r requirements/dev-complete.txt
 pkginfo==1.9.6
     # via conda-lock
 platformdirs==4.1.0
@@ -173,6 +179,8 @@ pygments==2.17.2
     # via ipython
 pylev==1.4.0
     # via clikit
+pyproject-hooks==1.0.0
+    # via build
 pyright==1.1.341
     # via -r requirements/dev-complete.txt
 pytest==7.4.3
@@ -263,9 +271,15 @@ wcwidth==0.2.12
     # via prompt-toolkit
 webencodings==0.5.1
     # via html5lib
+wheel==0.42.0
+    # via pip-tools
 zipp==3.17.0
     # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
+pip==23.3.2
+    # via pip-tools
 setuptools==69.0.2
-    # via nodeenv
+    # via
+    #   nodeenv
+    #   pip-tools

@@ -13,7 +13,7 @@ keywords = [
 ]
 license = { text = "NIST-PD" }
 authors = [{ name = "William P. Krekelberg", email = "wpk@nist.gov" }]
-requires-python = ">=3.8, <=3.12"
+requires-python = ">=3.8,<=3.12"
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Science/Research",
@@ -114,7 +114,7 @@ readme = { file = [
 [tool.setuptools_scm]
 fallback_version = "999"
 
-# * Linting
+# * Linting --------------------------------------------------------------------
 
 [tool.ruff]
 fix = true
@@ -202,7 +202,7 @@ docstring-code-format = true
 [tool.nbqa.addopts]
 ruff = ["--fix", "--extend-ignore=D100,B018"]
 
-# * Testing
+# * Testing --------------------------------------------------------------------
 
 [tool.pytest.ini_options]
 addopts = "--doctest-modules --doctest-glob='*.md' --pyargs"
@@ -266,13 +266,12 @@ reportPrivateUsage = false
 [tool.pytype]
 inputs = ["src", "tests"]
 
-# * Dependency creation
+# * Dependency creation --------------------------------------------------------
 
 [tool.pyproject2conda]
 user_config = "config/userconfig.toml"
 template_python = "requirements/py{py}-{env}"
 template = "requirements/{env}"
-# defaults
 python = ["3.11"]
 channels = ["conda-forge"]
 style = ["yaml", "requirements"]
@@ -282,18 +281,18 @@ default_envs = ["test", "typing", "docs", "dev", "dev-complete"]
 pytest-accept = { pip = true }
 scriv = { pip = true }
 
-[tool.pyproject2conda.envs.test-extras]
-extras = ["test"]
-base = false
-
 [tool.pyproject2conda.envs.build]
 extras = "build-system.requires"
 reqs = ["build"]
 base = false
 style = "requirements"
 
+[tool.pyproject2conda.envs.test-extras]
+extras = ["test"]
+base = false
+
 [[tool.pyproject2conda.overrides]]
-# Ensure these have pip
+# Ensure these have pip in yaml file
 envs = ["test", "docs", "dev", "dev-complete"]
 deps = ["pip"]
 
@@ -305,7 +304,7 @@ python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 allow-unsafe = true
 strip-extras = true
 
-## * Other tools
+# * Other tools ----------------------------------------------------------------
 
 [tool.scriv]
 format = "md"

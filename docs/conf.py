@@ -254,8 +254,7 @@ author = "William P. Krekelberg"
 def _get_version():
     import os
 
-    version = os.environ.get("SETUPTOOLS_SCM_PRETEND_VERSION", None)
-    if version is None:
+    if (version := os.environ.get("SETUPTOOLS_SCM_PRETEND_VERSION")) is None:
         version = open_notebook.__version__
     return version
 
