@@ -215,9 +215,7 @@ requests==2.31.0
     #   ensureconda
     #   scriv
 ruamel-yaml==0.18.5
-    # via
-    #   -r requirements/dev-complete.txt
-    #   conda-lock
+    # via conda-lock
 ruamel-yaml-clib==0.2.8
     # via ruamel-yaml
 scriv==1.5.1

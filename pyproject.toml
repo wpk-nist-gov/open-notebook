@@ -51,7 +51,6 @@ dev-extras = [
     "ipython",
     "nox",
     "pytest-accept",
-    "ruamel.yaml",
 ]
 docs = [
     "autodocsumm",
