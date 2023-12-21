@@ -276,7 +276,7 @@ tuna-import: ## Analyze load time for module
 
 .PHONY: typing-tools
 typing-tools:
-	mypy noxfile.py tools/*.py
+	mypy --strict noxfile.py tools/*.py
 	pyright noxfile.py tools/*.py
 
 .PHONY: cog-readme
