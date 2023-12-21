@@ -20,16 +20,15 @@ def override_sessionrunner_create_venv(self: SessionRunner) -> None:
 
     if callable(self.func.venv_backend):
         # if passed a callable backend, always use just that
-        # i.e., don't override
         logger.info("Using custom callable venv_backend")
 
-        self.venv = self.func.venv_backend(
-            location=self.envdir,
-            interpreter=self.func.python,
-            reuse_existing=self.func.reuse_venv or self.global_config.reuse_existing_virtualenvs,
-            venv_params=self.func.venv_params,
-            runner=self,
-        )
+        self.venv = self.func.venv_backend(self)
+        #     location=self.envdir,
+        #     interpreter=self.func.python,
+        #     reuse_existing=self.func.reuse_venv or self.global_config.reuse_existing_virtualenvs,
+        #     venv_params=self.func.venv_params,
+        #     runner=self,
+        # )
         return
     else:
         logger.info("Using nox venv_backend")
@@ -56,22 +55,21 @@ if TYPE_CHECKING:
 
 
 def factory_conda_backend(
-    backend: Literal["conda", "mamba", "micromamba"] = "conda"
+    backend: Literal["conda", "mamba", "micromamba"] = "conda",
 ) -> Callable[..., CondaEnv]:
     def passthrough_venv_backend(
-        location: str,
-        interpreter: str | None,
-        reuse_existing: bool,
-        venv_params: Any,
         runner: SessionRunner,
     ) -> CondaEnv:
+        # override allowed_globals
         CondaEnv.allowed_globals = ("conda", "mamba", "micromamba", "conda-lock")
 
+        assert isinstance(runner.func.python, str)
         return CondaEnv(
-            location=location,
-            interpreter=interpreter,
-            reuse_existing=reuse_existing,
-            venv_params=venv_params,
+            location=runner.envdir,
+            interpreter=runner.func.python,
+            reuse_existing=runner.func.reuse_venv
+            or runner.global_config.reuse_existing_virtualenvs,
+            venv_params=runner.func.venv_params,
             conda_cmd=backend,
         )
 
@@ -219,14 +217,14 @@ def is_conda_session(session: Session) -> bool:
 # * Main class ----------------------------------------------------------------
 class Installer:
     """
-    Class to handle installing package/dependecies
+    Class to handle installing package/dependencies
 
     Parameters
     ----------
     session : nox.Session
     update : bool, default=False
     lock : bool, default=False
-    package: str, optional
+    package: str or bool, optional
     pip_deps : str or list of str, optional
         pip dependencies
     requirements : str or list of str
@@ -236,7 +234,7 @@ class Installer:
     constraints : str or list of str
         pip constraint file(s) (pip install -c ...)
     config_path :
-        Where to save env config for furture comparison.  Defaults to
+        Where to save env config for future comparison.  Defaults to
         `session.create_tmp() / "env.json"`.
     """
 
@@ -247,7 +245,6 @@ class Installer:
         update: bool = False,
         lock: bool = False,
         package: str | bool | None = None,
-        package_extras: str | Iterable[str] | None = None,
         pip_deps: str | Iterable[str] | None = None,
         requirements: PathLike | Iterable[PathLike] | None = None,
         constraints: PathLike | Iterable[PathLike] | None = None,
@@ -270,9 +267,8 @@ class Installer:
         self.config_path = config_path
 
         if isinstance(package, bool):
-            package = "." if package else None
+            package = "-e . --no-deps" if package else None
         self.package = package
-        self.package_extras = _to_list_of_str(package_extras)
 
         self.pip_deps: list[str] = sorted(_remove_whitespace_list(pip_deps or []))
 
@@ -293,8 +289,10 @@ class Installer:
 
         # checks for for lock files
         if not self.is_conda_session():
-            if self.conda_deps or self.channels or self.conda_yaml:
-                raise ValueError("passing conda parameters to non conda session")
+            if self.conda_deps or self.conda_yaml:
+                raise ValueError(
+                    f"passing conda parameters to non conda session {self.conda_deps=} {self.conda_yaml=}"
+                )
 
         if self.lock:
             if not self.is_conda_session():
@@ -317,15 +315,19 @@ class Installer:
 
     @cached_property
     def config(self) -> dict[str, Any]:
-        """Dictionary of relavent info for this session"""
+        """Dictionary of relevant info for this session"""
         out: dict[str, Any] = {}
         out["lock"] = self.lock
 
-        for k in ["package", "package_extras", "pip_deps", "conda_deps", "channels"]:
+        # special for package:
+        if self.package:
+            out["package"] = get_package_hash(self.package)
+
+        for k in ["pip_deps", "conda_deps", "channels"]:
             if v := getattr(self, k):
                 out[k] = v
 
-        # file hashses
+        # file hashes
         for k in ["requirements", "constraints", "conda_yaml"]:
             if v := getattr(self, k):
                 if isinstance(v, Path):
@@ -345,6 +347,16 @@ class Installer:
             json.dump(self.config, f)
         return self
 
+    @cached_property
+    def previous_config(self) -> dict[str, Any]:
+        if not self.config_path.exists():
+            return {}
+        else:
+            import json
+
+            with self.config_path.open("r") as f:
+                return json.load(f)  # type: ignore
+
     def log_session(self) -> Self:
         logfile = Path(self.session.create_tmp()) / "env_info.txt"
         self.session.log(f"writing environment log to {logfile}")
@@ -358,16 +370,6 @@ class Installer:
                 self.session.run("pip", "list", stdout=f)
 
         return self
-
-    @cached_property
-    def previous_config(self) -> dict[str, Any]:
-        if not self.config_path.exists():
-            return {}
-        else:
-            import json
-
-            with self.config_path.open("r") as f:
-                return json.load(f)  # type: ignore
 
     # Interface
     @property
@@ -395,15 +397,47 @@ class Installer:
         return self.is_conda_session() and self.conda_cmd == "micromamba"
 
     @cached_property
+    def python_full_path(self) -> str:
+        path = self.session.run_always(
+            "python", "-c", "import sys; print(sys.executable)", silent=True
+        )  # type: ignore
+        if path is None:
+            raise ValueError("accessing python_full_path with value None")
+        return path.strip()
+
+    @cached_property
     def skip_install(self) -> bool:
         try:
-            return self.session._runner.global_config.no_install and self.session._runner.venv._reused  # type: ignore
+            return (
+                self.session._runner.global_config.no_install
+                and self.session._runner.venv._reused  # pyright: ignore
+            )  # type: ignore
         except Exception:
             return False
 
     @cached_property
+    def package_changed(self) -> bool:
+        """Whether the package has changed"""
+        if "package" in self.config and (
+            self.config["package"] == self.previous_config.get("package")
+        ):
+            return False
+        else:
+            self.session.log("package changed")
+            # self.session.log(str(self.config["package"]))
+            # self.session.log(str(self.previous_config["package"]))
+            return True
+
+    @cached_property
     def changed(self) -> bool:
-        out = self.config != self.previous_config
+        """Check for changes (excluding package)"""
+
+        a, b = (
+            {k: v for k, v in config.items() if k != "package"}
+            for config in (self.config, self.previous_config)
+        )
+
+        out = a != b
 
         msg = "changed" if out else "unchanged"
         self.session.log(f"session {self.session.name} {msg}")
@@ -440,17 +474,6 @@ class Installer:
             )
         return self
 
-    @property
-    def _package_str(self) -> str:
-        if self.package is None:
-            raise ValueError("Attempting to use unset package")
-
-        if self.package_extras:
-            package_extras = ",".join(self.package_extras)
-            return f"{self.package}[{package_extras}]"
-        else:
-            return self.package
-
     def install_all(
         self,
         update_package: bool = False,
@@ -481,8 +504,6 @@ class Installer:
         self,
         *args: Any,
         update: bool = False,
-        develop: bool = True,
-        no_deps: bool = True,
         opts: str | list[str] | None = None,
         **kwargs: Any,
     ) -> Self:
@@ -490,14 +511,8 @@ class Installer:
         if self.package is None or self.skip_install:
             pass
 
-        elif self.changed or (update := self.update or update):
-            command = [self._package_str]
-
-            if develop:
-                command.insert(0, "-e")
-
-            if no_deps:
-                command.append("--no-deps")
+        elif self.changed or self.package_changed or (update := self.update or update):
+            command = shlex.split(self.package, posix=True)
 
             if update:
                 command.append("--upgrade")
@@ -532,11 +547,16 @@ class Installer:
             # # Playing with using pip-sync.
             # # Not sure its worth it?
             if self.lock:
-                install_args = ["pip-tools"]
-                if update:
-                    install_args.insert(0, "--upgrade")
-                self.session.install(*install_args, **kwargs)
-                self.session.run_always("pip-sync", *map(str, self.requirements))
+                self.session.run_always("which", "pip-sync", external=True)
+                self.session.run_always(
+                    "pip-sync",
+                    "--python-executable",
+                    self.python_full_path,
+                    *map(str, self.requirements),
+                    silent=True,
+                    external=True,
+                )
+
             else:
                 install_args: list[str] = (
                     prepend_flag("-r", *map(str, self.requirements))
@@ -603,8 +623,7 @@ class Installer:
                     + extra_params
                 )
 
-            # Use normal tmpdir
-            # the session temp directory may or may not exist!
+            # NOTE: Use the normal tmpdir for safety (might be missing env/tmp)
             if cmd == "create":
                 self.session._run(*cmds, silent=True, env=self.env)
             else:
@@ -756,21 +775,21 @@ class Installer:
                 session=session,
                 envname=envname,
                 lock=lock,
-                lock_fallback=lock_fallback,
+                # lock_fallback=lock_fallback,
                 **kwargs,
             )
 
 
 # * Utilities --------------------------------------------------------------------------
-def _to_list_of_str(x: str | Iterable[str] | None) -> list[str]:
-    if x is None:
-        return []
-    elif isinstance(x, str):
-        return [x]
-    elif isinstance(x, list):
-        return x
-    else:
-        return list(x)
+# def _to_list_of_str(x: str | Iterable[str] | None) -> list[str]:
+#     if x is None:
+#         return []
+#     elif isinstance(x, str):
+#         return [x]
+#     elif isinstance(x, list):
+#         return x
+#     else:
+#         return list(x)
 
 
 def _remove_whitespace(s: str) -> str:
@@ -860,6 +879,38 @@ def _get_file_hash(path: str | Path, buff_size: int = 65536) -> str:
     return md5.hexdigest()
 
 
+def _get_zipfile_hash(path: str | Path) -> str:
+    import hashlib
+    from zipfile import ZipFile
+
+    md5 = hashlib.md5()
+
+    with ZipFile(path, "r") as f:
+        for thing in f.infolist():
+            md5 = hashlib.md5(f.read(thing))
+
+    return md5.hexdigest()
+
+
+def get_package_hash(package: str) -> list[str]:
+    import re
+
+    out: list[str] = []
+
+    for x in shlex.split(package):
+        out.append(x)
+
+        # remove possible extras
+        x_clean = re.sub(r"\[.*?\]$", "", x)
+        if Path(x_clean).is_file():
+            if x_clean.endswith(".whl"):
+                out.append(_get_zipfile_hash(x_clean))
+            else:
+                out.append(_get_file_hash(x_clean))
+
+    return out
+
+
 @contextmanager
 def check_for_change_manager(
     *deps: str | Path,
@@ -874,7 +925,7 @@ def check_for_change_manager(
     ------
     changed: bool
 
-    If exit normaly, write hashes to hash_path file
+    If exit normally, write hashes to hash_path file
     """
 
     try:

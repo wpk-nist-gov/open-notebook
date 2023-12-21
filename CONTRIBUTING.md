@@ -270,7 +270,7 @@ nox -s docs -- +d build open
 
 ### Creating environment.yaml/requirement.txt files
 
-The project is setup to create `environemt.yaml` and `requirement.txt` files
+The project is setup to create `environment.yaml` and `requirement.txt` files
 from `pyproject.toml`. This can be done using:
 
 ```bash
@@ -318,7 +318,7 @@ where commands can be one of:
   [ghp-import](https://github.com/c-w/ghp-import))
 - livehtml : Live documentation updates
 - open : open the documentation in a web browser
-- serve : Serve the created documentation webpage (Need this to view javescript
+- serve : Serve the created documentation webpage (Need this to view javascript
   in created pages).
 
 ## Testing with nox

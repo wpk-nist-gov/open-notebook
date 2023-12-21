@@ -327,9 +327,7 @@ def create_config(
     else:
         path = Path(path)
 
-        assert (
-            path.is_dir()
-        ), f"Can only specify a directory to place the config file {CONFIG_FILE_NAME} into"
+        assert path.is_dir(), f"Can only specify a directory to place the config file {CONFIG_FILE_NAME} into"
 
         path = path / CONFIG_FILE_NAME
 

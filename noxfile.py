@@ -16,6 +16,7 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Callable,
+    Iterable,
     Iterator,
     Literal,
     Sequence,
@@ -88,8 +89,6 @@ for backend in ["mamba", "micromamba", "conda"]:
 else:
     raise ValueError("no conda-like backend found")
 
-# CONDA_BACKEND = "micromamba"
-
 
 class SessionOptionsDict(TypedDict, total=False):
     """Dict for options to nox.session"""
@@ -157,6 +156,9 @@ class SessionParams(DataclassParser):
     # requirements
     requirements_force: bool = False
     requirements_run: RUN_ANNO = None
+    requirements_no_notify: bool = add_option(
+        default=False, help="Skip notification of pip-compile"
+    )
 
     # conda-lock
     conda_lock_channel: OPT_TYPE = add_option(help="conda channels")
@@ -290,9 +292,11 @@ def example(
     session: Session,
     opts: SessionParams,
 ) -> None:
-    Installer.from_envname(
-        session=session, envname="thing", package=".", update=opts.update
+    runner = Installer.from_envname(
+        session=session, envname="thing", package=True, update=opts.update
     ).install_all(update_package=opts.update_package)
+
+    session.log(runner.python_full_path)
 
 
 @add_opts
@@ -308,7 +312,7 @@ def dev(
             envname=opts.dev_envname,
             lock=opts.lock,
             update=opts.update,
-            package=".",
+            package=True,
         )
         .install_all(
             update_package=opts.update_package,
@@ -323,7 +327,6 @@ nox.session(name="dev-venv", **DEFAULT_KWS)(dev)
 nox.session(name="dev", **CONDA_DEFAULT_KWS)(dev)
 
 
-# ** config
 @nox.session(python=False)
 @add_opts
 def config(
@@ -378,7 +381,7 @@ def requirements(
             *(["--overwrite", "force"] if opts.requirements_force else []),
         )
 
-        if opts.lock:
+        if not opts.requirements_no_notify and opts.lock:
             for py in PYTHON_ALL_VERSIONS:
                 session.notify(f"pip-compile-{py}")
 
@@ -460,12 +463,6 @@ def conda_lock(
     session_run_commands(session, opts.conda_lock_run)
     for path in (ROOT / "requirements").relative_to(ROOT.cwd()).glob("py*.yaml"):
         create_lock(path)
-
-
-@nox.session(name="pip-compile-default", python=False)
-def pip_compile_default(session: Session) -> None:
-    """Notify default pip-compile session with args"""
-    session.notify(f"pip-compile-{PYTHON_DEFAULT_VERSION}")
 
 
 @nox.session(name="pip-compile", **ALL_KWS)
@@ -572,7 +569,10 @@ def test(
             session=session,
             envname="test",
             lock=opts.lock,
-            package=".",
+            ## To use editable install
+            # package=True,
+            ## To use full install
+            package=get_package_wheel(session, opts="--no-deps --force-reinstall"),
             update=opts.update,
         ).install_all(log_session=opts.log_session, update_package=opts.update_package)
     )
@@ -598,7 +598,7 @@ def test_notebook(session: nox.Session, opts: SessionParams) -> None:
             session=session,
             envname="test-notebook",
             lock=opts.lock,
-            package=".",
+            package=True,
             update=opts.update,
         ).install_all(log_session=opts.log_session, update_package=opts.update_package)
     )
@@ -672,18 +672,6 @@ def testdist(
     if opts.version:
         install_str = f"{install_str}=={opts.version}"
 
-    # from tempfile import NamedTemporaryFile
-    # Play with doing it all via environment files
-    # path = Path("./requirements/testdist-tmp")
-    # assert session.python
-    # if is_conda_session(session):
-    #     cmds = ["yaml", "-p", session.python, "-d"]
-    #     path = path.with_suffix(".yaml")
-    # else:
-    #     cmds = ["requirements", "-r"]
-    #     path = path.with_suffix(".txt")
-    # cmds = cmds.extend([install_str, ])
-
     if is_conda_session(session):
         pip_deps, conda_deps = None, install_str
     else:
@@ -705,7 +693,7 @@ def testdist(
         run=opts.testdist_run,
         test_no_pytest=opts.test_no_pytest,
         test_opts=opts.test_opts,
-        no_cov=True,
+        no_cov=opts.no_cov,
     )
 
 
@@ -725,7 +713,11 @@ def docs(
     message with 'message=...' in posargs.
     """
     runner = Installer.from_envname(
-        session=session, envname="docs", lock=opts.lock, package=".", update=opts.update
+        session=session,
+        envname="docs",
+        lock=opts.lock,
+        package=True,
+        update=opts.update,
     ).install_all(
         update_package=opts.update_package,
         log_session=opts.log_session,
@@ -814,7 +806,7 @@ def typing(
             lock=opts.lock,
             update=opts.update,
             # need package for nbqa checks
-            package=".",
+            package=True,
         )
         .install_all(log_session=opts.log_session)
         .run_commands(opts.typing_run)
@@ -907,7 +899,51 @@ def build(session: nox.Session, opts: SessionParams) -> None:
                 session.log(out.strip().split("\n")[-1])  # type: ignore
 
 
-# def get_package_wheel(session: Session) -> str:
+def get_package_wheel(
+    session: Session,
+    opts: str | Iterable[str] | None = None,
+    extras: str | Iterable[str] | None = None,
+    reuse: bool = True,
+) -> str:
+    """
+    Build the package in return the build location
+
+    This is similar to how tox does isolated builds.
+
+    Note that the first time this is called,
+
+    Should be straightforward to extend this to isolated builds
+    that depend on python version (something like have session build-3.11 ....)
+    """
+
+    dist_location = Path(session.cache_dir) / "dist"
+    if reuse and getattr(get_package_wheel, "_called", False):
+        session.log("Reuse isolated build")
+    else:
+        cmd = f"nox -s build -- ++build-outdir {dist_location} ++build-opts -w ++build-silent"
+        session.run(*shlex.split(cmd), external=True)
+
+        # save that this was called:
+        if reuse:
+            get_package_wheel._called = True  # type: ignore
+
+    paths = list(dist_location.glob("*.whl"))
+    if len(paths) != 1:
+        raise ValueError("something wonky with paths {paths}")
+
+    path = str(paths[0])
+
+    if extras:
+        if not isinstance(extras, str):
+            extras = ",".join(extras)
+        path = f"{path}[{extras}]"
+
+    if opts:
+        if not isinstance(opts, str):
+            opts = " ".join(opts)
+        path = f"{path} {opts}"
+
+    return path
 
 
 @nox.session
@@ -1111,35 +1147,3 @@ def _append_recipe(recipe_path: str, append_path: str) -> None:
 
     with open(recipe_path, "w") as f:
         f.writelines(recipe + ["\n"] + append)
-
-
-# # If want separate env for updating/reporting version with setuptools-scm
-# # We do this from dev environment.
-# # ** version report/update
-# @nox.session(**DEFAULT_KWS)
-# def version_scm(
-#     session: Session,
-#     version: VERSION_CLI = "",
-#     update: UPDATE_CLI = False,
-# ):
-#     """
-#     Get current version from setuptools-scm
-
-#     Note that the version of editable installs can get stale.
-#     This will show the actual current version.
-#     Avoids need to include setuptools-scm in develop/docs/etc.
-#     """
-
-#     pkg_install_venv(
-#         session=session,
-#         name="version-scm",
-#         install_package=True,
-#         reqs=["setuptools_scm"],
-#         update=opts.update,
-#         no_deps=True,
-#     )
-
-#     if version:
-#         session.env["SETUPTOOLS_SCM_PRETEND_VERSION"] = version
-
-#     session.run("python", "-m", "setuptools_scm")
