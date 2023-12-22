@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from open_notebook import config
+from pathlib import Path
+from typing import Any
 
 import pytest
-from pathlib import Path
 
-from typing import Any
+from open_notebook import config
 
 from .utils import inside_dir
 

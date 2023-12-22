@@ -1,21 +1,21 @@
 from __future__ import annotations
-from textwrap import dedent
 
-from typing import TYPE_CHECKING
-import pytest
-
+import shlex
 from pathlib import Path
+from textwrap import dedent
+from typing import TYPE_CHECKING
+
+import pytest
 
 from open_notebook import cli
 from open_notebook.utils import MISSING
 
 from .utils import run_inside_dir
 
-import shlex
-
 if TYPE_CHECKING:
-    from typing import Any
     import argparse
+    from typing import Any
+
     from open_notebook._typing import MISSING_TYPE
 
 
@@ -255,8 +255,8 @@ def test_run(example_path: Path) -> None:
 
 
 def test_main(example_path: Path) -> None:
-    from subprocess import check_call
     import shlex
+    from subprocess import check_call
 
     out = check_call(shlex.split("python -m open_notebook --help"))
 

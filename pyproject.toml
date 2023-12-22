@@ -132,16 +132,17 @@ exclude = [
     ".ruff_cache",
     ".svn",
     ".tox",
+    ".nox",
     ".venv",
+    "venv",
     "__pypackages__",
     "_build",
     "buck-out",
     "build",
     "dist",
     "node_modules",
-    "venv",
-    "tests/",
-    "src/open_notebook/tests",
+    # "tests/",
+    # "src/open_notebook/tests",
 ]
 
 [tool.ruff.lint]
@@ -191,6 +192,9 @@ ignore = [
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 # per-file-ignores = {  }
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["D100"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["open_notebook"]

@@ -1,13 +1,14 @@
 from __future__ import annotations
-import pytest
-from open_notebook import config
 
-from pathlib import Path
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .utils import run_inside_dir
+import pytest
 
+from open_notebook import config
+
+from .utils import run_inside_dir
 
 if TYPE_CHECKING:
     from typing import Generator, TypeVar
