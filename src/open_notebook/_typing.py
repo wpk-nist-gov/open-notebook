@@ -5,6 +5,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing_extensions import Literal
 
-    from .utils import _Missing
+    from .utils import _Missing  # pyright: ignore[reportPrivateUsage]
 
     MISSING_TYPE = Literal[_Missing.MISSING]

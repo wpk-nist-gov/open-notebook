@@ -31,7 +31,7 @@ def run_inside_dir(
     """Run a command from inside a given directory, returning the exit status"""
 
     if dirpath is None:
-        dirpath = Path(".")
+        dirpath = Path()
 
     with inside_dir(dirpath):
         logger.info(f"Run: {command}")

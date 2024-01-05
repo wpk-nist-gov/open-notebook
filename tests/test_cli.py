@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import locale
 import shlex
 from pathlib import Path
 from textwrap import dedent
@@ -48,26 +49,23 @@ def base_cli_options(
     dry: bool = False,
     paths: list[Path | str] | None = None,
 ) -> dict[str, Any]:
-    if paths is None:
-        paths_verified = []
-    else:
-        paths_verified = list(map(Path, paths))
+    paths_verified = [] if paths is None else list(map(Path, paths))
 
-    return dict(
-        host=host,
-        port=port,
-        root=root,
-        dir_prefix=dir_prefix,
-        file_prefix=file_prefix,
-        reset=reset,
-        config=config,
-        create_config=create_config,
-        overwrite=overwrite,
-        version=version,
-        verbose=verbose,
-        dry=dry,
-        paths=paths_verified,
-    )
+    return {
+        "host": host,
+        "port": port,
+        "root": root,
+        "dir_prefix": dir_prefix,
+        "file_prefix": file_prefix,
+        "reset": reset,
+        "config": config,
+        "create_config": create_config,
+        "overwrite": overwrite,
+        "version": version,
+        "verbose": verbose,
+        "dry": dry,
+        "paths": paths_verified,
+    }
 
 
 def test_parser() -> None:
@@ -113,7 +111,7 @@ def test_verbosity() -> None:
     assert cli.logger.level == logging.ERROR
 
     cli.set_verbosity_level(cli.logger, 0)
-    assert cli.logger.level == logging.WARN
+    assert cli.logger.level == logging.WARNING
 
     cli.main(["-v"])
     assert cli.logger.level == logging.INFO
@@ -135,13 +133,13 @@ def base_options(
     dir_prefix: str = "tree",
     file_prefix: str = "notebooks",
 ) -> dict[str, Any]:
-    return dict(
-        host=host,
-        port=port,
-        root=Path(root),
-        dir_prefix=dir_prefix,
-        file_prefix=file_prefix,
-    )
+    return {
+        "host": host,
+        "port": port,
+        "root": Path(root),
+        "dir_prefix": dir_prefix,
+        "file_prefix": file_prefix,
+    }
 
 
 def test_get_options(example_path: Path, home_path: Path) -> None:
@@ -173,7 +171,9 @@ def test_get_options_alt(example_path: Path, home_path: Path) -> None:
     port = "9999"
     """
 
-    with open(".open-notebook.toml", "w") as f:
+    with Path(".open-notebook.toml").open(
+        "w", encoding=locale.getpreferredencoding(False)
+    ) as f:
         f.write(dedent(s))
 
     # check config files:
@@ -194,11 +194,12 @@ def test_create_config0(example_path: Path) -> None:
     options = base_options()
     options["root"] = "."
 
-    cli.create_config(options=options, paths=[Path(".")])
+    cli.create_config(options=options, paths=[Path()])
 
     import tomli
 
-    with open(".open-notebook.toml", "rb") as f:
+    # with open(".open-notebook.toml", "rb") as f:
+    with Path(".open-notebook.toml").open("rb") as f:
         data = tomli.load(f)
 
     assert data == options
@@ -217,7 +218,7 @@ def test_create_config1(example_path: Path) -> None:
 
     import tomli
 
-    with open(".open-notebook.toml", "rb") as f:
+    with Path(".open-notebook.toml").open("rb") as f:
         data = tomli.load(f)
 
     assert data == options

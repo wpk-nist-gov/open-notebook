@@ -10,7 +10,7 @@ from open_notebook import config
 from .utils import inside_dir
 
 
-def test_Config_simple() -> None:
+def test_config_simple() -> None:
     c = config.Config(data={"hello": "there"})
 
     assert c.get("hello") == "there"
@@ -28,13 +28,13 @@ def base_options(
     dir_prefix: str = "tree",
     file_prefix: str = "notebooks",
 ) -> dict[str, Any]:
-    return dict(
-        host=host,
-        port=port,
-        root=Path(root),
-        dir_prefix=dir_prefix,
-        file_prefix=file_prefix,
-    )
+    return {
+        "host": host,
+        "port": port,
+        "root": Path(root),
+        "dir_prefix": dir_prefix,
+        "file_prefix": file_prefix,
+    }
 
 
 def test_base() -> None:
@@ -98,7 +98,7 @@ def test_find_config_with_config(
 ) -> None:
     out = config.get_config_files(home=home_path)
 
-    assert out["cwd"] == Path(".").absolute() / config.CONFIG_FILE_NAME
+    assert out["cwd"] == Path().absolute() / config.CONFIG_FILE_NAME
     assert out["git"] is None
     assert out["home"] == home_path / config.CONFIG_FILE_NAME
 

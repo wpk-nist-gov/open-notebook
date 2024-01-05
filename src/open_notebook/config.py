@@ -34,13 +34,15 @@ def get_git_root_path(cwd: str | Path | None = None) -> Path | None:
     if cwd:
         cwd = Path(cwd).expanduser().absolute()
     result = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"], capture_output=True, cwd=cwd
+        ["git", "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        cwd=cwd,
+        check=False,
     )
     out = result.stdout.decode().rstrip()
     if out:
         return Path(out).absolute()
-    else:
-        return None
+    return None
 
 
 def get_config_files(
@@ -76,8 +78,7 @@ def get_config_files(
         p = d / config_name
         if p.exists():
             return p.absolute()
-        else:
-            return None
+        return None
 
     # check current directory
     out["cwd"] = _has_config(cwd)
@@ -106,7 +107,7 @@ class Config:
     ) -> None:
         self.data: Iterable[Mapping[str, Any]]
         if isinstance(data, Mapping):
-            self.data = [data]  # pyright: ignore
+            self.data = [data]  # pyright: ignore[reportGeneralTypeIssues]
         else:
             self.data = data
 
@@ -137,8 +138,7 @@ class Config:
         # else use default
         if factory is not None:
             return factory()  # pragma: no cover
-        else:
-            return default
+        return default
 
     def get_option(
         self,
@@ -177,7 +177,7 @@ class Config:
         if passed is not MISSING:
             return passed
 
-        elif section is not None:
+        if section is not None:
             out = self.get(section, key)
             if out is not MISSING:
                 return out
@@ -189,14 +189,14 @@ class Config:
         # Fall back to top level or default_params
         return self.get(key, default=default, factory=factory)
 
-    ## * Options
+    # * Options
     def host(
         self,
         section: str | None = None,
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> str:
-        return self.get_option(  # type: ignore
+        return self.get_option(  # type: ignore[no-any-return]
             section=section, key="host", passed=passed, default=default
         )
 
@@ -206,7 +206,7 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> str:
-        return self.get_option(  # type: ignore
+        return self.get_option(  # type: ignore[no-any-return]
             section=section, key="port", passed=passed, default=default
         )
 
@@ -216,14 +216,8 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> Path:
-        return (
-            Path(
-                self.get_option(
-                    section=section, key="root", passed=passed, default=default
-                )
-            )
-            # .expanduser()
-            # .absolute()
+        return Path(
+            self.get_option(section=section, key="root", passed=passed, default=default)
         )
 
     def dir_prefix(
@@ -232,7 +226,7 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> str:
-        return self.get_option(  # type: ignore
+        return self.get_option(  # type: ignore[no-any-return]
             section=section, key="dir_prefix", passed=passed, default=default
         )
 
@@ -242,7 +236,7 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> str:
-        return self.get_option(  # type: ignore
+        return self.get_option(  # type: ignore[no-any-return]
             section=section, key="file_prefix", passed=passed, default=default
         )
 
@@ -252,7 +246,7 @@ class Config:
             out[k] = getattr(self, k)(section=section, passed=kws.get(k, MISSING))
         return out
 
-    ## * Factory
+    # * Factory
     # specialty stuff
     @classmethod
     def from_paths(
@@ -283,9 +277,8 @@ class Config:
         if isinstance(strings, str):
             strings = [strings]
 
-        data: list[dict[str, Any]] = []
-        for string in strings:
-            data.append(tomli.loads(string))
+        data: list[dict[str, Any]] = [tomli.loads(string) for string in strings]
+
         return cls(data, default_params=default_params)
 
     @classmethod
@@ -306,7 +299,7 @@ class Config:
         return cls.from_paths(paths, default_params=default_params)
 
 
-## * Create config
+# * Create config
 def create_config(
     host: str,
     port: str,
@@ -319,10 +312,9 @@ def create_config(
 ) -> None:
     """Create a configuration file."""
     if path is None:
-        if home is None:
-            home = Path.home()  # pragma: no cover
-        else:
-            home = Path(home).expanduser().absolute()
+        home = (
+            Path(home).expanduser().absolute() if home else Path.home()
+        )  # pragma: no cover
         path = home / CONFIG_FILE_NAME
     else:
         path = Path(path)
@@ -332,9 +324,8 @@ def create_config(
         path = path / CONFIG_FILE_NAME
 
     if path.exists() and not overwrite:
-        raise ValueError(
-            f"file {path} exists.  Either remove this file or specify overwrite"
-        )
+        msg = f"file {path} exists.  Either remove this file or specify overwrite"
+        raise ValueError(msg)
 
     from textwrap import dedent
 

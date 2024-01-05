@@ -1,5 +1,7 @@
+# pyright: reportPrivateUsage=false
 from __future__ import annotations
 
+import locale
 from pathlib import Path
 
 import pytest
@@ -7,7 +9,7 @@ import pytest
 from open_notebook.handler import JupyterUrlHandler
 
 
-@pytest.fixture
+@pytest.fixture()
 def default_handler() -> JupyterUrlHandler:
     return JupyterUrlHandler(
         root="~/top/level",
@@ -35,7 +37,9 @@ def test_path_to_url(default_handler: JupyterUrlHandler, tmp_path: Path) -> None
     other_dir = tmp_path / "a" / "b"
     other_dir.mkdir(parents=True)
 
-    with open(other_dir / "tmp.ipynb", "w") as _:  # pyright: ignore
+    with Path(other_dir / "tmp.ipynb").open(
+        "w", encoding=locale.getpreferredencoding(False)
+    ) as _:
         pass
 
     assert h.paths_to_urls(other_dir) == ["http://localhost:8888/tree/a/b"]

@@ -60,5 +60,4 @@ def get_in(
     except (KeyError, IndexError, TypeError):
         if factory is not None:
             return factory()
-        else:
-            return default
+        return default
