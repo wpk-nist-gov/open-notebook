@@ -7,12 +7,12 @@
 # You should not manually edit this file.
 # Instead edit the corresponding pyproject.toml file.
 #
+conda-lock
 ipykernel
 ipython
-mypy >= 1.4.1
-nbqa
+mypy>=1.4.1
 nox
-noxopt
+pip-tools
 pre-commit
 pyright
 pytest
@@ -20,9 +20,7 @@ pytest-accept
 pytest-cov
 pytest-sugar
 pytest-xdist
-pytype; python_version < '3.11'
-ruamel.yaml
+pytype;python_version<"3.11"
 scriv
-setuptools-scm>=8.0
 tomli
 typing-extensions

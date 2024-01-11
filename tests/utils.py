@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
 import shlex
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ def run_inside_dir(
     """Run a command from inside a given directory, returning the exit status"""
 
     if dirpath is None:
-        dirpath = Path(".")
+        dirpath = Path()
 
     with inside_dir(dirpath):
         logger.info(f"Run: {command}")

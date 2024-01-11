@@ -9,16 +9,13 @@
 #
 ipykernel
 ipython
-mypy >= 1.4.1
+mypy>=1.4.1
 nox
-noxopt
 pytest
 pytest-accept
 pytest-cov
 pytest-sugar
 pytest-xdist
-pytype; python_version < '3.11'
-ruamel.yaml
-setuptools-scm>=8.0
+pytype;python_version<"3.11"
 tomli
 typing-extensions

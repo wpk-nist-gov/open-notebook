@@ -23,7 +23,7 @@
 [repo-badge]: https://img.shields.io/badge/--181717?logo=github&logoColor=ffffff
 [repo-link]: https://github.com/usnistgov/open-notebook
 [conda-badge]: https://img.shields.io/conda/v/conda-forge/open-notebook
-[conda-link]: https://anaconda.org/conda-forge/open-notebook
+[Conda-link]: https://anaconda.org/conda-forge/open-notebook
 [license-badge]: https://img.shields.io/pypi/l/cmomy?color=informational
 [license-link]: https://github.com/usnistgov/open-notebook/blob/main/LICENSE
 <!-- prettier-ignore-end -->

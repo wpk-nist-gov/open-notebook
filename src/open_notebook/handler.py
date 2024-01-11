@@ -32,7 +32,8 @@ class JupyterUrlHandler:
         path = path.expanduser().absolute()
 
         if (self.root not in path.parents) and (self.root != path):
-            raise ValueError(f"path {path} is not a subpath of root {self.root}.")
+            msg = f"path {path} is not a subpath of root {self.root}."
+            raise ValueError(msg)
 
         return Path(relpath(path.expanduser().absolute(), start=self.root))
 
@@ -56,7 +57,8 @@ class JupyterUrlHandler:
             elif path.is_file():
                 url = self._path_to_url(path, modifier=self.file_prefix, suffix=suffix)
             else:
-                raise ValueError(f"path {path} is not a file or directory")
+                msg = f"path {path} is not a file or directory"
+                raise ValueError(msg)
             urls.append(url)
 
         return urls

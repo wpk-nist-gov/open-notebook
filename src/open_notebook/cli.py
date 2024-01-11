@@ -22,7 +22,7 @@ import logging
 
 # * Logging
 FORMAT = "[%(name)s - %(levelname)s] %(message)s"
-logging.basicConfig(level=logging.WARN, format=FORMAT)
+logging.basicConfig(level=logging.WARNING, format=FORMAT)
 logger = logging.getLogger(__name__)
 
 
@@ -107,10 +107,11 @@ def get_parser() -> argparse.ArgumentParser:
 def set_verbosity_level(logger: logging.Logger, verbosity: int | None) -> None:
     if verbosity is None:
         return
-    elif verbosity < 0:
+
+    if verbosity < 0:
         level = logging.ERROR
     elif verbosity == 0:
-        level = logging.WARN
+        level = logging.WARNING
     elif verbosity == 1:
         level = logging.INFO
     else:
@@ -155,7 +156,8 @@ def create_config(
     elif n == 1:
         p = paths[0]
     else:
-        raise ValueError("can specify zero or one path for config file")
+        msg = "can specify zero or one path for config file"
+        raise ValueError(msg)
 
     config.create_config(**options, overwrite=overwrite, path=p, home=home)
 
@@ -178,16 +180,15 @@ def main(args: Sequence[str] | None = None, home: str | Path | None = None) -> i
 
     # get cli options
     parser = get_parser()
-    if args is None:
-        cli_options = parser.parse_args()  # pragma: no cover
-    else:
-        cli_options = parser.parse_args(args)
+    cli_options = (
+        parser.parse_args() if args is None else parser.parse_args(args)
+    )  # pragma: no cover
 
     set_verbosity_level(logger=logger, verbosity=cli_options.verbose)
     logger.debug(f"cli options: {cli_options}")
 
     if cli_options.version:
-        print(get_version_string())
+        print(get_version_string())  # noqa: T201
 
     elif cli_options.create_config:
         create_config(
