@@ -259,6 +259,6 @@ def test_main(example_path: Path) -> None:
     import shlex
     from subprocess import check_call
 
-    out = check_call(shlex.split("python -m open_notebook --help"))
+    out = check_call(shlex.split("python -m open_notebook --help"))  # noqa: S603
 
     assert out == 0

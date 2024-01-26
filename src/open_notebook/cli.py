@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_parser() -> argparse.ArgumentParser:
+    """Get base parser."""
     parser = argparse.ArgumentParser(
         prog="open-notebook",
         description="Program to open jupyter notebooks from central notebook server.",
@@ -105,6 +106,7 @@ def get_parser() -> argparse.ArgumentParser:
 
 
 def set_verbosity_level(logger: logging.Logger, verbosity: int | None) -> None:
+    """Set verbosity level."""
     if verbosity is None:
         return
 
@@ -124,6 +126,7 @@ def set_verbosity_level(logger: logging.Logger, verbosity: int | None) -> None:
 
 
 def get_version_string() -> str:
+    """Get version string."""
     from open_notebook import __version__
 
     return f"open-notebook, {__version__}"
@@ -134,12 +137,13 @@ def get_options(
     section: str | None = None,
     home: str | Path | None = None,
 ) -> dict[str, Any]:
+    """Get option."""
     from open_notebook import config
 
     options = config.Config.from_config_files(home=home).to_options_dict(
         section=section, **vars(cli_options)
     )
-    logger.debug(f"options: {options}")
+    logger.debug("options: %s", options)
     return options
 
 
@@ -149,6 +153,7 @@ def create_config(
     overwrite: bool = False,
     home: str | Path | None = None,
 ) -> None:
+    """Create configuration."""
     from open_notebook import config
 
     if (n := len(paths)) == 0:
@@ -163,6 +168,7 @@ def create_config(
 
 
 def open_paths(options: dict[str, Any], paths: list[Path], dry: bool = False) -> None:
+    """Open path as url."""
     from open_notebook import handler
 
     h = handler.JupyterUrlHandler(**options)
@@ -170,14 +176,13 @@ def open_paths(options: dict[str, Any], paths: list[Path], dry: bool = False) ->
     urls = h.paths_to_urls(paths)
 
     for url in urls:
-        logger.info(f"opening: {url}")
+        logger.info("opening: %s", url)
         if not dry:
             handler.open_urls(url)  # pragma: no cover
 
 
 def main(args: Sequence[str] | None = None, home: str | Path | None = None) -> int:
     """Console script for open_notebook."""
-
     # get cli options
     parser = get_parser()
     cli_options = (
@@ -185,7 +190,7 @@ def main(args: Sequence[str] | None = None, home: str | Path | None = None) -> i
     )  # pragma: no cover
 
     set_verbosity_level(logger=logger, verbosity=cli_options.verbose)
-    logger.debug(f"cli options: {cli_options}")
+    logger.debug("cli options: %s", cli_options)
 
     if cli_options.version:
         print(get_version_string())  # noqa: T201

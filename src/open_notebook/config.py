@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Mapping
 from .utils import MISSING, get_in
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterable
+    from typing import Any, Callable, Iterable, Sequence
 
     from typing_extensions import Self
 
@@ -31,10 +31,11 @@ DEFAULT_PARAMS = {
 
 
 def get_git_root_path(cwd: str | Path | None = None) -> Path | None:
+    """Get root path of git repo."""
     if cwd:
         cwd = Path(cwd).expanduser().absolute()
     result = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
+        ["git", "rev-parse", "--show-toplevel"],  # noqa: S603, S607
         capture_output=True,
         cwd=cwd,
         check=False,
@@ -64,7 +65,6 @@ def get_config_files(
     config_name : str, default=".open-notebook.ini"
     Name of config file
     """
-
     out: dict[str, Path | None] = {}
 
     cwd = Path(cwd).expanduser().absolute()
@@ -102,12 +102,12 @@ class Config:
 
     def __init__(
         self,
-        data: Mapping[str, Any] | Iterable[Mapping[str, Any]],
+        data: Mapping[str, Any] | Sequence[Mapping[str, Any]],
         default_params: Mapping[str, Any] | None = None,
     ) -> None:
         self.data: Iterable[Mapping[str, Any]]
         if isinstance(data, Mapping):
-            self.data = [data]  # pyright: ignore[reportGeneralTypeIssues]
+            self.data = [data]
         else:
             self.data = data
 
@@ -173,7 +173,6 @@ class Config:
             Fallback value to return
 
         """
-
         if passed is not MISSING:
             return passed
 
@@ -196,6 +195,7 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> str:
+        """Host option."""
         return self.get_option(  # type: ignore[no-any-return]
             section=section, key="host", passed=passed, default=default
         )
@@ -206,6 +206,7 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> str:
+        """Port option."""
         return self.get_option(  # type: ignore[no-any-return]
             section=section, key="port", passed=passed, default=default
         )
@@ -216,6 +217,7 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> Path:
+        """Root option."""
         return Path(
             self.get_option(section=section, key="root", passed=passed, default=default)
         )
@@ -226,6 +228,7 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> str:
+        """Directory prefix option."""
         return self.get_option(  # type: ignore[no-any-return]
             section=section, key="dir_prefix", passed=passed, default=default
         )
@@ -236,11 +239,13 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> str:
+        """File prefix option."""
         return self.get_option(  # type: ignore[no-any-return]
             section=section, key="file_prefix", passed=passed, default=default
         )
 
     def to_options_dict(self, section: str | None = None, **kws: Any) -> dict[str, Any]:
+        """Convert options to dictionary."""
         out: dict[str, Any] = {}
         for k in ["host", "port", "root", "dir_prefix", "file_prefix"]:
             out[k] = getattr(self, k)(section=section, passed=kws.get(k, MISSING))
@@ -254,6 +259,7 @@ class Config:
         paths: str | Path | Iterable[str | Path],
         default_params: Mapping[str, Any] | None = None,
     ) -> Self:
+        """Create from path(s)."""
         import tomli
 
         if isinstance(paths, (str, Path)):
@@ -272,6 +278,7 @@ class Config:
         strings: str | Iterable[str],
         default_params: Mapping[str, Any] | None = None,
     ) -> Self:
+        """Create from string(s)."""
         import tomli
 
         if isinstance(strings, str):
@@ -289,6 +296,7 @@ class Config:
         home: str | Path | None = None,
         default_params: Mapping[str, Any] | None = None,
     ) -> Self:
+        """Create from config file(s)."""
         config_path_dict = get_config_files(cwd=cwd, home=home, config_name=name)
 
         paths: list[str | Path] = []
@@ -319,7 +327,9 @@ def create_config(
     else:
         path = Path(path)
 
-        assert path.is_dir(), f"Can only specify a directory to place the config file {CONFIG_FILE_NAME} into"
+        if not path.is_dir():
+            msg = f"Can only specify a directory to place the config file {CONFIG_FILE_NAME} into"  # pragma: no cover
+            raise OSError(msg)
 
         path = path / CONFIG_FILE_NAME
 

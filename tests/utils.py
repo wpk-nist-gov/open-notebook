@@ -34,5 +34,5 @@ def run_inside_dir(
         dirpath = Path()
 
     with inside_dir(dirpath):
-        logger.info(f"Run: {command}")
-        return subprocess.run(shlex.split(command), check=True, stdout=subprocess.PIPE)
+        logger.info("Run: %s", command)
+        return subprocess.run(shlex.split(command), check=True, stdout=subprocess.PIPE)  # noqa: S603
