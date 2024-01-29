@@ -76,7 +76,6 @@ test = [
 ]
 tools = [
     "conda-lock",
-    "pip-tools",
     "pre-commit",
     "pyright",
     "scriv",
