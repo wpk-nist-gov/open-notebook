@@ -215,7 +215,11 @@ docstring-code-format = true
 addopts = "--doctest-modules --doctest-glob='*.md' --pyargs"
 testpaths = ["open_notebook", "tests", "README.md"]
 
+[tool.coverage.run]
+branch = true
+
 [tool.coverage.report]
+show_missing = true
 exclude_also = ["if TYPE_CHECKING:", "@overload"]
 omit = ["*/vendored/*", "*/_typing.py"]
 include = ["src/*"]

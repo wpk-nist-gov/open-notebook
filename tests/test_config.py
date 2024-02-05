@@ -50,6 +50,25 @@ def test_base() -> None:
     assert base_options(dir_prefix="tr") == c.to_options_dict(dir_prefix="tr")
     assert base_options(file_prefix="no") == c.to_options_dict(file_prefix="no")
 
+    new_defaults = {
+        "host": "thing",
+        "port": "8889",
+        "root": "~/",
+        "dir_prefix": "tr",
+        "file_prefix": "no",
+    }
+    c = config.Config([], default_params=new_defaults)
+
+    assert c.host() == new_defaults["host"]
+    assert c.port() == new_defaults["port"]
+    assert c.root() == Path(new_defaults["root"])
+    assert c.dir_prefix() == new_defaults["dir_prefix"]
+    assert c.file_prefix() == new_defaults["file_prefix"]
+
+    assert c.get_option(key="port", passed="hello") == "hello"
+    assert c.get_option(key="port") == "8889"
+    assert c.get_option(key="port", default="9999") == "9999"
+
 
 def test_git_root(example_path: Path) -> None:
     assert Path.cwd() == example_path
@@ -109,6 +128,20 @@ def test_find_config_with_git(example_path_with_git: Path, home_path: Path) -> N
     assert out["cwd"] is None
     assert out["git"] is None
     assert out["home"] == home_path / config.CONFIG_FILE_NAME
+
+
+def test_create_config_no_parent(example_path_with_git_config: Path) -> None:
+    path = example_path_with_git_config / "a" / "thing" / "test"
+
+    with pytest.raises(OSError):
+        config.create_config(
+            host="localhost",
+            port="8888",
+            root="~/hello",
+            dir_prefix="tr",
+            file_prefix="no",
+            path=path,
+        )
 
 
 def test_find_config_with_git_config(
