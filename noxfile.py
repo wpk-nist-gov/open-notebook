@@ -561,8 +561,6 @@ def _test(
             if not any(o.startswith("--cov") for o in opts):
                 opts.append(f"--cov={IMPORT_NAME}")
 
-            opts.append("--cov-config=pyproject.toml")
-
         # Because we are testing if temporary folders
         # have git or not, we have to make sure we're above the
         # not under this repo

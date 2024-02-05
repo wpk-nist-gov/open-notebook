@@ -212,8 +212,17 @@ docstring-code-format = true
 # * Testing --------------------------------------------------------------------
 
 [tool.pytest.ini_options]
-addopts = "--doctest-modules --doctest-glob='*.md' --pyargs"
-testpaths = ["open_notebook", "tests", "README.md"]
+addopts = [
+    "--doctest-modules",
+    "--doctest-glob=*.md",
+    "--pyargs",
+    "--cov-config=pyproject.toml",
+]
+testpaths = [
+    "open_notebook",
+    "tests",
+    "README.md",
+]
 
 [tool.coverage.run]
 branch = true
