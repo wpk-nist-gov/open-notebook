@@ -209,6 +209,10 @@ known-first-party = ["open_notebook"]
 [tool.ruff.format]
 docstring-code-format = true
 
+[tool.check-wheel-contents]
+toplevel = ["open_notebook"]
+src_dir = ["src"]
+
 # * Testing --------------------------------------------------------------------
 
 [tool.pytest.ini_options]
