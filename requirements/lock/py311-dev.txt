@@ -128,9 +128,7 @@ traitlets==5.14.1
     #   jupyter-core
     #   matplotlib-inline
 typing-extensions==4.9.0
-    # via
-    #   -r requirements/dev.txt
-    #   mypy
+    # via mypy
 virtualenv==20.25.0
     # via nox
 wcwidth==0.2.13

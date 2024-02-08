@@ -244,7 +244,6 @@ traitlets==5.14.1
     #   matplotlib-inline
 typing-extensions==4.9.0
     # via
-    #   -r requirements/dev-complete.txt
     #   conda-lock
     #   mypy
     #   pydantic

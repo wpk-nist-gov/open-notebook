@@ -55,7 +55,7 @@ tomli==2.0.1
     #   -r requirements/typing.txt
     #   mypy
     #   pytest
-typing-extensions==4.9.0
+typing-extensions==4.9.0 ; python_version < "3.11"
     # via
     #   -r requirements/typing.txt
     #   libcst

@@ -22,4 +22,4 @@ pytest-xdist
 pytype;python_version<"3.11"
 scriv
 tomli
-typing-extensions
+typing-extensions;python_version<"3.11"

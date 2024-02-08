@@ -14,4 +14,3 @@ dependencies:
   - mypy>=1.4.1
   - pytest
   - tomli
-  - typing-extensions

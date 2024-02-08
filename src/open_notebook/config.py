@@ -13,9 +13,8 @@ from .utils import MISSING, get_in
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterable, Sequence
 
-    from typing_extensions import Self
-
     from ._typing import MISSING_TYPE
+    from ._typing_compat import Self
 
 
 # * Parameters

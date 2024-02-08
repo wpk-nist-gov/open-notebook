@@ -23,7 +23,6 @@ dependencies:
   - pytest-sugar
   - pytest-xdist
   - tomli
-  - typing-extensions
   - pip
   - pip:
       - pytest-accept
