@@ -4,7 +4,7 @@
 #
 #    pip-compile --allow-unsafe --output-file=requirements/lock/py38-test.txt --strip-extras requirements/test.txt
 #
-coverage==7.4.1
+coverage==7.4.3
     # via
     #   coverage
     #   pytest-cov
@@ -20,7 +20,7 @@ packaging==23.2
     #   pytest-sugar
 pluggy==1.4.0
     # via pytest
-pytest==8.0.0
+pytest==8.0.2
     # via
     #   -r requirements/test.txt
     #   pytest-cov
@@ -39,5 +39,5 @@ tomli==2.0.1
     #   -r requirements/test.txt
     #   coverage
     #   pytest
-typing-extensions==4.9.0 ; python_version < "3.11"
+typing-extensions==4.10.0 ; python_version < "3.11"
     # via -r requirements/test.txt

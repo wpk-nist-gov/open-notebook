@@ -2,6 +2,7 @@
 Configuration file routines (:mod:`~open_notebook.config`)
 ==========================================================
 """
+
 from __future__ import annotations
 
 import subprocess

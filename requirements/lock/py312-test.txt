@@ -4,7 +4,7 @@
 #
 #    pip-compile --allow-unsafe --output-file=requirements/lock/py312-test.txt --strip-extras requirements/test.txt
 #
-coverage==7.4.1
+coverage==7.4.3
     # via
     #   coverage
     #   pytest-cov
@@ -18,7 +18,7 @@ packaging==23.2
     #   pytest-sugar
 pluggy==1.4.0
     # via pytest
-pytest==8.0.0
+pytest==8.0.2
     # via
     #   -r requirements/test.txt
     #   pytest-cov
