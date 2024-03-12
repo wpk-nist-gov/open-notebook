@@ -12,10 +12,7 @@ channels:
 dependencies:
   - python=3.11
   - autodocsumm
-  - ghp-import
-  - ipython
-  - myst-nb
-  - pydata-sphinx-theme!=0.14.2
+  - myst-parser
   - pyenchant
   - sphinx-argparse
   - sphinx-autobuild

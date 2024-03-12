@@ -11,7 +11,6 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
-  - mypy>=1.8.0
-  - pyright>=1.1.352
+  - packaging
   - pytest
   - tomli
