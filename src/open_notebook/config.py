@@ -331,7 +331,7 @@ def create_config(
             msg = f"Can only specify a directory to place the config file {CONFIG_FILE_NAME} into"  # pragma: no cover
             raise OSError(msg)
 
-        path = path / CONFIG_FILE_NAME
+        path /= CONFIG_FILE_NAME
 
     if path.exists() and not overwrite:
         msg = f"file {path} exists.  Either remove this file or specify overwrite"

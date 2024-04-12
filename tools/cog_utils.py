@@ -81,10 +81,10 @@ def cat_lines(
     output = "\n".join(lines[slice(begin, end)])
 
     if begin_dot:
-        output = "# ...\n" + output
+        output += "# ...\n"
 
     if end_dot:
-        output = output + "\n# ..."
+        output += "\n# ..."
 
     output = "\n```toml\n" + output + "\n```\n"
     print(output)  # noqa: T201
