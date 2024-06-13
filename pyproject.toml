@@ -49,7 +49,7 @@ optional-dependencies.dev-complete = [
     "open-notebook[dev,tools]",
 ]
 optional-dependencies.dev-extras = [
-    "nox>=2024.3.2",
+    "nox>=2024.4.15",
     "pytest-accept",
 ]
 optional-dependencies.docs = [
