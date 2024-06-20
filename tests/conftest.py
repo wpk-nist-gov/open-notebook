@@ -11,7 +11,8 @@ from open_notebook import config
 from .utils import run_inside_dir
 
 if TYPE_CHECKING:
-    from typing import Generator, TypeVar
+    from collections.abc import Generator
+    from typing import TypeVar
 
     T = TypeVar("T")
     YieldFixture = Generator[T, None, None]

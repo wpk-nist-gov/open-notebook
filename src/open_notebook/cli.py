@@ -15,7 +15,7 @@ from open_notebook.utils import MISSING
 from .config import DEFAULT_PARAMS
 
 if TYPE_CHECKING:
-    from typing import Sequence
+    from collections.abc import Sequence
 
 
 import logging

@@ -6,13 +6,15 @@ Configuration file routines (:mod:`~open_notebook.config`)
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Mapping
+from typing import TYPE_CHECKING
 
 from .utils import MISSING, get_in
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterable, Sequence
+    from collections.abc import Iterable, Sequence
+    from typing import Any, Callable
 
     from ._typing import MISSING_TYPE
     from ._typing_compat import Self
