@@ -36,8 +36,8 @@ def get_git_root_path(cwd: str | Path | None = None) -> Path | None:
     """Get root path of git repo."""
     if cwd:
         cwd = Path(cwd).expanduser().absolute()
-    result = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],  # noqa: S603, S607
+    result = subprocess.run(  # noqa: S603
+        ["git", "rev-parse", "--show-toplevel"],  # noqa: S607
         capture_output=True,
         cwd=cwd,
         check=False,
