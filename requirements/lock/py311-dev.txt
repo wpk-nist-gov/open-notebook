@@ -2,12 +2,12 @@
 #    uv pip compile --python-version=3.11 --annotation-style=line -o requirements/lock/py311-dev.txt requirements/dev.txt
 argcomplete==3.4.0        # via nox
 colorlog==6.8.2           # via nox
-coverage==7.5.3           # via pytest-cov
+coverage==7.5.4           # via pytest-cov
 distlib==0.3.8            # via virtualenv
 execnet==2.1.1            # via pytest-xdist
-filelock==3.15.3          # via virtualenv
+filelock==3.15.4          # via virtualenv
 iniconfig==2.0.0          # via pytest
-mypy==1.10.0              # via -r requirements/dev.txt
+mypy==1.10.1              # via -r requirements/dev.txt
 mypy-extensions==1.0.0    # via mypy
 nox==2024.4.15            # via -r requirements/dev.txt
 packaging==24.1           # via nox, pytest, pytest-sugar, -r requirements/dev.txt
@@ -21,4 +21,4 @@ pytest-xdist==3.6.1       # via -r requirements/dev.txt
 termcolor==2.4.0          # via pytest-sugar
 tomli==2.0.1              # via -r requirements/dev.txt
 typing-extensions==4.12.2  # via mypy
-virtualenv==20.26.2       # via nox
+virtualenv==20.26.3       # via nox
