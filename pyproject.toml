@@ -43,7 +43,7 @@ dependencies = [
     "typing-extensions; python_version<'3.11'",
 ]
 optional-dependencies.dev = [
-    "open-notebook[dev-extras,test,typing,pipxrun,mypy]",
+    "open-notebook[dev-extras,test,typing,uvxrun,mypy]",
 ]
 optional-dependencies.dev-complete = [
     "open-notebook[dev,tools]",
@@ -64,23 +64,10 @@ optional-dependencies.docs = [
     "sphinxcontrib-spelling",
 ]
 optional-dependencies.mypy = [
-    "mypy>=1.10.1",
+    "mypy>=1.11.2",
 ]
 optional-dependencies.nbval = [
     "nbval",
-]
-optional-dependencies.pipxrun = [
-    # Anything needed to run tools/pipxrun.py
-    "packaging",
-]
-optional-dependencies.pipxrun-tools = [
-    # these used solely for specking tools to be used with tools/pipxrun.py
-    "conda-lock>=2.5.5",
-    "grayskull>=2.5.3",
-    "nbqa>=1.8.4",
-    "open-notebook[mypy]",
-    "pyright>=1.1.370",
-    "twine>=5.0.0",
 ]
 optional-dependencies.test = [
     "pytest",
@@ -89,13 +76,25 @@ optional-dependencies.test = [
     "pytest-xdist",
 ]
 optional-dependencies.tools = [
-    "pipx",
     "pre-commit",
     "scriv",
 ]
 optional-dependencies.typing = [
-    "open-notebook[pipxrun]",
+    "open-notebook[uvxrun]",
     "pytest",
+]
+optional-dependencies.uvxrun = [
+    # Anything needed to run tools/uvxrun.py
+    "packaging",
+]
+optional-dependencies.uvxrun-tools = [
+    # these used solely for specking tools to be used with tools/uvxrun.py
+    "conda-lock>=2.5.5",
+    "grayskull>=2.5.3",
+    "nbqa>=1.8.4",
+    "open-notebook[mypy]",
+    "pyright>=1.1.370",
+    "twine>=5.0.0",
 ]
 urls.Documentation = "https://pages.nist.gov/open-notebook/"
 urls.Homepage = "https://github.com/usnistgov/open-notebook"
@@ -163,7 +162,6 @@ lint.ignore = [
     # * Other
     "E501", # - line too long - let formatter fix this
     "E731", # - do not assign a lambda expression, use a def
-    "ERA",  # - eradicate (want to keep some stuff)
     "FBT",  # - bools are ok
     "ISC",  # - flake8-implicit-str-concat
     # * Allow non top level imports
@@ -172,8 +170,7 @@ lint.ignore = [
 ]
 # Use extend-ignore for project specific ignores (avoid changing ignore directly)
 lint.extend-ignore = [
-    "NPY", # - not using numpy?
-    "PD",  # - not using pandas?
+    # "ERA", # - eradicate (want to keep some stuff)
     # * Annotations
     # "SLF001",  # - flake8-self (private access sometimes OK)
     # "ANN",     # - Annotations (just use mypy/pyright)
@@ -185,6 +182,11 @@ lint.extend-ignore = [
     # "D102",    # - Missing docstring in public method
     # "D103",    # - Missing docstring in public function
     # "D202",    # - blank line after docstring
+    "DOC201", # - Missing return from documentation
+    "DOC202", # - Missing return from documentation
+    "DOC501", # - Missing raises from documentation
+    "NPY",    # - not using numpy?
+    "PD",     # - not using pandas?
 ]
 lint.per-file-ignores."**/*.ipynb" = [
     "B018",
@@ -192,6 +194,7 @@ lint.per-file-ignores."**/*.ipynb" = [
     "INP001",
 ]
 lint.per-file-ignores."docs/conf.py" = [
+    "ERA",
     "INP001",
 ]
 lint.per-file-ignores."noxfile.py" = [
@@ -204,6 +207,7 @@ lint.per-file-ignores."tests/*.py" = [
 lint.per-file-ignores."tools/*.py" = [
     "A",
     "D102",
+    "DOC402",
     "S",
     "SLF001",
 ]
@@ -219,6 +223,7 @@ lint.extend-per-file-ignores."tests/*.py" = [
 ]
 # fixable = ["ALL"]
 lint.unfixable = [
+    "ERA",
     "PLR6104",
     "T",
 ]
@@ -397,8 +402,8 @@ reqs = [
 base = false
 style = "requirements"
 
-[tool.pyproject2conda.envs.pipxrun-tools]
-extras = "pipxrun-tools"
+[tool.pyproject2conda.envs.uvxrun-tools]
+extras = "uvxrun-tools"
 base = false
 style = "requirements"
 
@@ -434,9 +439,19 @@ python = [
     "3.12",
 ]
 
+# * pip-tools (keeping for legacy) ---------------------------------------------
+
 [tool.pip-tools]
 allow-unsafe = true
 strip-extras = true
+
+# * uv -------------------------------------------------------------------------
+
+[tool.uv]
+managed = false
+
+[tool.uv.pip]
+annotation-style = "line"
 
 # * Other tools ----------------------------------------------------------------
 

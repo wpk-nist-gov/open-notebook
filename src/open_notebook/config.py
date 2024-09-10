@@ -117,14 +117,6 @@ class Config:
             default_params = DEFAULT_PARAMS
         self.default_params = default_params
 
-    # def append(self, data: Mapping[str, Any], inplace: bool = False) -> Self:
-    #     if inplace:
-    #         self.data.append(data)
-    #         return self
-    #     else:
-    #         self.data + [data]
-    #         return type(self)(data)
-
     def get(
         self,
         *keys: str,

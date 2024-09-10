@@ -7,7 +7,7 @@
 # You should not manually edit this file.
 # Instead edit the corresponding pyproject.toml file.
 #
-mypy>=1.10.1
+mypy>=1.11.2
 nox>=2024.4.15
 packaging
 pytest
