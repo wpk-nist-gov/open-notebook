@@ -94,7 +94,7 @@ optional-dependencies.uvxrun-tools = [
     "grayskull>=2.5.3",
     "nbqa>=1.8.4",
     "open-notebook[mypy]",
-    "pyright>=1.1.381",
+    "pyright>=1.1.382",
     "twine>=5.0.0",
 ]
 urls.Documentation = "https://pages.nist.gov/open-notebook/"
