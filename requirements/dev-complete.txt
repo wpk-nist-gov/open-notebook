@@ -7,7 +7,7 @@
 # You should not manually edit this file.
 # Instead edit the corresponding pyproject.toml file.
 #
-mypy>=1.11.2
+mypy>=1.13.0
 nox>=2024.4.15
 packaging
 pre-commit

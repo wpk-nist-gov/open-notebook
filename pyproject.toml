@@ -43,17 +43,26 @@ dependencies = [
     "tomli",
     "typing-extensions; python_version<'3.11'",
 ]
-optional-dependencies.dev = [
-    "open-notebook[dev-extras,test,typing,uvxrun,mypy]",
+urls.Documentation = "https://pages.nist.gov/open-notebook/"
+urls.Homepage = "https://github.com/usnistgov/open-notebook"
+scripts.nopen = "open_notebook.cli:main"
+scripts.open-notebook = "open_notebook.cli:main"
+
+[dependency-groups]
+dev = [
+    { include-group = "dev-extras" },
+    { include-group = "mypy" },
+    { include-group = "test" },
+    { include-group = "typing" },
+    { include-group = "uvxrun" },
 ]
-optional-dependencies.dev-complete = [
-    "open-notebook[dev,tools]",
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytest-sugar",
+    "pytest-xdist",
 ]
-optional-dependencies.dev-extras = [
-    "nox>=2024.4.15",
-    "pytest-accept",
-]
-optional-dependencies.docs = [
+docs = [
     "autodocsumm",
     "myst-parser",
     "pyenchant",
@@ -64,43 +73,42 @@ optional-dependencies.docs = [
     "sphinx-copybutton",
     "sphinxcontrib-spelling",
 ]
-optional-dependencies.mypy = [
-    "mypy>=1.11.2",
+dev-complete = [
+    { include-group = "dev" },
+    { include-group = "tools" },
 ]
-optional-dependencies.nbval = [
+dev-extras = [
+    "nox>=2024.4.15",
+    "pytest-accept",
+]
+mypy = [
+    "mypy>=1.13.0",
+]
+nbval = [
     "nbval",
 ]
-optional-dependencies.test = [
-    "pytest",
-    "pytest-cov",
-    "pytest-sugar",
-    "pytest-xdist",
-]
-optional-dependencies.tools = [
+tools = [
     "pre-commit",
     "scriv",
 ]
-optional-dependencies.typing = [
-    "open-notebook[uvxrun]",
+typing = [
     "pytest",
+    { include-group = "uvxrun" },
 ]
-optional-dependencies.uvxrun = [
+uvxrun = [
     # Anything needed to run tools/uvxrun.py
     "packaging",
 ]
-optional-dependencies.uvxrun-tools = [
+uvxrun-tools = [
     # these used solely for specking tools to be used with tools/uvxrun.py
     "conda-lock>=2.5.5",
     "grayskull>=2.5.3",
     "nbqa>=1.8.4",
-    "open-notebook[mypy]",
+    "pyproject2conda>=0.13.0",
     "pyright>=1.1.382",
     "twine>=5.0.0",
+    { include-group = "mypy" },
 ]
-urls.Documentation = "https://pages.nist.gov/open-notebook/"
-urls.Homepage = "https://github.com/usnistgov/open-notebook"
-scripts.nopen = "open_notebook.cli:main"
-scripts.open-notebook = "open_notebook.cli:main"
 
 [tool.hatch.version]
 source = "vcs"
@@ -389,6 +397,7 @@ default_envs = [
     "docs",
     "dev",
     "dev-complete",
+    "uvxrun-tools",
 ]
 
 [tool.pyproject2conda.dependencies]
@@ -396,23 +405,21 @@ pytest-accept = { pip = true }
 scriv = { pip = true }
 
 [tool.pyproject2conda.envs.build]
-extras = "build-system.requires"
-reqs = [
-    "build",
-]
-base = false
-style = "requirements"
-
-[tool.pyproject2conda.envs.uvxrun-tools]
-extras = "uvxrun-tools"
-base = false
-style = "requirements"
+groups = "build-system.requires"
 
 [tool.pyproject2conda.envs.test-extras]
-extras = [
+groups = [
     "test",
 ]
-base = false
+
+[[tool.pyproject2conda.overrides]]
+envs = [
+    "build",
+    "uvxrun-tools",
+    "test-extras",
+]
+skip_package = true
+style = "requirements"
 
 [[tool.pyproject2conda.overrides]]
 # Ensure these have pip in yaml file
