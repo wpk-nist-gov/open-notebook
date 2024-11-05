@@ -13,9 +13,7 @@ keywords = [
     "open-notebook",
 ]
 license = { text = "NIST-PD" }
-license-files = { paths = [
-    "LICENSE",
-] }
+license-files = { paths = [ "LICENSE" ] }
 authors = [
     { name = "William P. Krekelberg", email = "wpk@nist.gov" },
 ]
@@ -81,12 +79,7 @@ dev-extras = [
     "nox>=2024.4.15",
     "pytest-accept",
 ]
-mypy = [
-    "mypy>=1.13.0",
-]
-nbval = [
-    "nbval",
-]
+mypy = [ "mypy>=1.13.0" ]
 tools = [
     "pre-commit",
     "scriv",
@@ -95,17 +88,15 @@ typing = [
     "pytest",
     { include-group = "uvxrun" },
 ]
-uvxrun = [
-    # Anything needed to run tools/uvxrun.py
-    "packaging",
-]
+# Anything needed to run tools/uvxrun.py
+uvxrun = [ "packaging" ]
 uvxrun-tools = [
     # these used solely for specking tools to be used with tools/uvxrun.py
     "conda-lock>=2.5.5",
     "grayskull>=2.5.3",
     "nbqa>=1.8.4",
     "pyproject2conda>=0.13.0",
-    "pyright>=1.1.382",
+    "pyright>=1.1.388",
     "twine>=5.0.0",
     { include-group = "mypy" },
 ]
@@ -248,12 +239,8 @@ lint.pylint.max-public-methods = 30
 lint.preview = true
 
 [tool.check-wheel-contents]
-toplevel = [
-    "open_notebook",
-]
-src_dir = [
-    "src",
-]
+toplevel = [ "open_notebook" ]
+src_dir = [ "src" ]
 
 # * Testing --------------------------------------------------------------------
 
@@ -317,13 +304,11 @@ strict = true
 
 [[tool.mypy.overrides]]
 ignore_missing_imports = true
-module = [
-]
+module = [  ]
 
 [[tool.mypy.overrides]]
 ignore_errors = true
-module = [
-]
+module = [  ]
 
 [tool.pyright]
 include = [
@@ -404,19 +389,13 @@ default_envs = [
 pytest-accept = { pip = true }
 scriv = { pip = true }
 
-[tool.pyproject2conda.envs.build]
-groups = "build-system.requires"
-
 [tool.pyproject2conda.envs.test-extras]
-groups = [
-    "test",
-]
+groups = [ "test" ]
+skip_package = true
 
 [[tool.pyproject2conda.overrides]]
 envs = [
-    "build",
     "uvxrun-tools",
-    "test-extras",
 ]
 skip_package = true
 style = "requirements"
@@ -429,9 +408,7 @@ envs = [
     "dev",
     "dev-complete",
 ]
-deps = [
-    "pip",
-]
+deps = [ "pip" ]
 
 [[tool.pyproject2conda.overrides]]
 envs = [
