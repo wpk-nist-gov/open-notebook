@@ -79,8 +79,8 @@ pre-commit-ruff-all: ## run ruff lint and format
 ################################################################################
 .PHONY: user-autoenv-zsh user-all
 user-autoenv-zsh: ## create .autoenv.zsh files
-	echo conda activate ./.venv > .autoenv.zsh
-	echo conda deactivate > .autoenv_leave.zsh
+	echo source ./.venv/bin/activate > .autoenv.zsh
+	echo deactivate > .autoenv_leave.zsh
 
 user-all: user-autoenv-zsh ## runs user scripts
 
@@ -237,7 +237,7 @@ test-notebook:  ## run pytest --nbval
 
 .PHONY: clean-kernelspec
 clean-kernelspec: ## cleanup unused kernels (assuming notebooks handled by conda environment notebook)
-	python tools/clean_kernelspec.py
+	uv run tools/clean_kernelspec.py
 
 ################################################################################
 # * Other tools
