@@ -14,4 +14,5 @@ nbqa>=1.8.4
 pre-commit
 pyproject2conda>=0.13.0
 pyright>=1.1.390
+scriv
 twine>=5.0.0
