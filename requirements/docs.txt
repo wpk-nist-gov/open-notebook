@@ -8,10 +8,7 @@
 # Instead edit the corresponding pyproject.toml file.
 #
 autodocsumm
-ghp-import
-ipython
-myst-nb
-pydata-sphinx-theme!=0.14.2
+myst-parser
 pyenchant
 sphinx-argparse
 sphinx-autobuild
@@ -20,4 +17,4 @@ sphinx-copybutton
 sphinx>=5.3.0
 sphinxcontrib-spelling
 tomli
-typing-extensions
+typing-extensions;python_version<"3.11"

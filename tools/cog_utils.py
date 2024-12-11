@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 def wrap_command(cmd: str) -> str:
+    """Wrap command at 80 characters."""
     x = textwrap.wrap(cmd.strip(), 80)
 
     if len(cmd) > 1:
@@ -22,6 +23,7 @@ def wrap_command(cmd: str) -> str:
 
 @lru_cache
 def get_pyproject(path: str) -> list[str]:
+    """Read pyproject."""
     with Path(path).open(encoding=locale.getpreferredencoding(False)) as f:
         return [_.strip() for _ in f]
 
@@ -32,6 +34,7 @@ def run_command(
     include_cmd: bool = True,
     bounds: tuple[int | None, int | None] | None = None,
 ) -> None:
+    """Run command as subprocess."""
     args = shlex.split(cmd)
     output = subprocess.check_output(args)
 
@@ -64,6 +67,7 @@ def cat_lines(
     begin_dot: bool = False,
     end_dot: bool = False,
 ) -> None:
+    """Echo lines of file."""
     lines = get_pyproject(path)
 
     begin_dot = begin_dot or begin is not None
@@ -77,10 +81,10 @@ def cat_lines(
     output = "\n".join(lines[slice(begin, end)])
 
     if begin_dot:
-        output = "# ...\n" + output
+        output += "# ...\n"
 
     if end_dot:
-        output = output + "\n# ..."
+        output += "\n# ..."
 
     output = "\n```toml\n" + output + "\n```\n"
     print(output)  # noqa: T201

@@ -11,8 +11,7 @@ channels:
   - conda-forge
 dependencies:
   - python=3.9
-  - mypy>=1.4.1
+  - packaging
   - pytest
-  - pytype
   - tomli
   - typing-extensions

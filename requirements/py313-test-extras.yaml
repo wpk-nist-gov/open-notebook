@@ -10,22 +10,8 @@
 channels:
   - conda-forge
 dependencies:
-  - python=3.11
-  - conda-lock
-  - ipykernel
-  - ipython
-  - mypy>=1.4.1
-  - nox
-  - pip-tools
-  - pre-commit
-  - pyright
+  - python=3.13
   - pytest
   - pytest-cov
   - pytest-sugar
   - pytest-xdist
-  - tomli
-  - typing-extensions
-  - pip
-  - pip:
-      - pytest-accept
-      - scriv

@@ -6,7 +6,10 @@ import shlex
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -34,5 +37,5 @@ def run_inside_dir(
         dirpath = Path()
 
     with inside_dir(dirpath):
-        logger.info(f"Run: {command}")
-        return subprocess.run(shlex.split(command), check=True, stdout=subprocess.PIPE)
+        logger.info("Run: %s", command)
+        return subprocess.run(shlex.split(command), check=True, stdout=subprocess.PIPE)  # noqa: S603

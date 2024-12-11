@@ -9,7 +9,7 @@ import pytest
 from open_notebook.handler import JupyterUrlHandler
 
 
-@pytest.fixture()
+@pytest.fixture
 def default_handler() -> JupyterUrlHandler:
     return JupyterUrlHandler(
         root="~/top/level",

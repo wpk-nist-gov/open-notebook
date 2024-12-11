@@ -7,20 +7,10 @@
 # You should not manually edit this file.
 # Instead edit the corresponding pyproject.toml file.
 #
-conda-lock
-ipykernel
-ipython
-mypy>=1.4.1
-nox
-pip-tools
-pre-commit
-pyright
-pytest
-pytest-accept
-pytest-cov
-pytest-sugar
-pytest-xdist
-pytype;python_version<"3.11"
-scriv
-tomli
-typing-extensions
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - packaging
+  - pytest
+  - tomli

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Iterable
+    from collections.abc import Iterable
 
 
 class JupyterUrlHandler:
@@ -47,6 +47,7 @@ class JupyterUrlHandler:
     def paths_to_urls(
         self, paths: Path | str | Iterable[str | Path], suffix: str | None = None
     ) -> list[str]:
+        """Convert paths to urls."""
         if isinstance(paths, (Path, str)):
             paths = [paths]
 
@@ -70,6 +71,7 @@ class JupyterUrlHandler:
         new: int = 0,
         autoraise: bool = True,
     ) -> None:
+        """Open paths as urls."""
         open_urls(  # pragma: no cover
             urls=self.paths_to_urls(paths=paths, suffix=suffix),
             new=new,
@@ -80,6 +82,7 @@ class JupyterUrlHandler:
 def open_urls(
     urls: str | Iterable[str], new: int = 0, autoraise: bool = True
 ) -> None:  # pragma: no cover
+    """Open urls."""
     import webbrowser
 
     if isinstance(urls, str):

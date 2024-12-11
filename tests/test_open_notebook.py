@@ -1,6 +1,5 @@
 """Tests for `open-notebook` package."""
 
-
 from open_notebook import __version__
 
 

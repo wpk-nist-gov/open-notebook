@@ -20,11 +20,6 @@ if TYPE_CHECKING:
     from open_notebook._typing import MISSING_TYPE
 
 
-# @pytest.fixture
-# def parser() -> ArgumentParser:
-#     return cli.get_parser()
-
-
 def parse_args(arg: str = "") -> argparse.Namespace:
     parser = cli.get_parser()
     return parser.parse_args(shlex.split(arg))
@@ -104,7 +99,6 @@ def test_verbosity() -> None:
     import logging
 
     cli.main([])
-    # assert 0 == 0
     assert cli.logger.level == 0
 
     cli.set_verbosity_level(cli.logger, -1)
@@ -228,7 +222,6 @@ def test_create_config2(example_path: Path) -> None:
     cli.main(["--create-config", "-r", ".", "."])
 
     options = base_options()
-    # options["root"] = "."
 
     from open_notebook import config
 
@@ -259,6 +252,6 @@ def test_main(example_path: Path) -> None:
     import shlex
     from subprocess import check_call
 
-    out = check_call(shlex.split("python -m open_notebook --help"))
+    out = check_call(shlex.split("python -m open_notebook --help"))  # noqa: S603
 
     assert out == 0
