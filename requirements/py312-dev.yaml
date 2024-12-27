@@ -7,13 +7,18 @@
 # You should not manually edit this file.
 # Instead edit the corresponding pyproject.toml file.
 #
-mypy>=1.13.0
-nox>=2024.4.15
-packaging
-pytest
-pytest-accept
-pytest-cov
-pytest-sugar
-pytest-xdist
-tomli
-typing-extensions;python_version<"3.11"
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - mypy>=1.14.0
+  - nox>=2024.4.15
+  - packaging
+  - pytest
+  - pytest-cov
+  - pytest-sugar
+  - pytest-xdist
+  - tomli
+  - pip
+  - pip:
+      - pytest-accept
