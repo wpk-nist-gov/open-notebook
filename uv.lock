@@ -1652,7 +1652,7 @@ wheels = [
 
 [[package]]
 name = "open-notebook"
-version = "0.1.1.dev113+g9fc46c5.d20241227"
+version = "0.1.1.dev114+g4d190b8.d20241227"
 source = { editable = "." }
 dependencies = [
     { name = "tomli" },
