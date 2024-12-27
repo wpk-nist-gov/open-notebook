@@ -258,5 +258,5 @@ tuna-import	: ## Analyze load time for module
 
 .PHONY: cog-readme
 cog-readme: ## apply cog to README.md
-	nox -s cog
+	COLUMNS=90 uvx --from=cogapp cog -rP README.md
 	pre-commit run markdownlint --files README.md

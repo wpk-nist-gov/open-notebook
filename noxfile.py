@@ -1019,11 +1019,13 @@ def conda_build(session: nox.Session, opts: SessionParams) -> None:
 
 
 # ** Other utilities
-@nox.session
+@nox.session(**DEFAULT_KWS)
 @add_opts
-def cog(session: nox.Session, opts: SessionParams) -> None:  # noqa: ARG001
+def cog(session: nox.Session, opts: SessionParams) -> None:
     """Run cog."""
-    session.install("cogapp")
+    install_dependencies(session, name="cog", opts=opts)
+    install_package(session, editable=True, update=True)
+
     session.run("cog", "-rP", "README.md", env={"COLUMNS": "90"})
 
 
