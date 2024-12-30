@@ -381,6 +381,15 @@ def install_package(
 
 
 # * Environments------------------------------------------------------------------------
+# ** test-all
+@nox.session(name="test-all", python=False)
+def test_all(session: Session) -> None:
+    """Run all tests and coverage"""
+    for py in PYTHON_ALL_VERSIONS:
+        session.notify(f"test-{py}")
+    session.notify("coverage")
+
+
 # ** dev
 @nox.session(name="dev", python=False)
 @add_opts
@@ -455,6 +464,9 @@ def lock(
     """Run uv pip compile ..."""
     options: list[str] = ["-U"] if opts.lock_upgrade else []
     force = opts.lock_force or opts.lock_upgrade
+
+    if opts.lock and opts.lock_upgrade:
+        session.run("uv", "lock", "--upgrade", env={"VIRTUAL_ENV": ".venv"})
 
     reqs_path = Path("./requirements")
     for path in reqs_path.glob("*.txt"):
@@ -1034,9 +1046,7 @@ def conda_build(session: nox.Session, opts: SessionParams) -> None:
 @add_opts
 def cog(session: nox.Session, opts: SessionParams) -> None:
     """Run cog."""
-    install_dependencies(session, name="cog", opts=opts)
-    install_package(session, editable=True, update=True)
-
+    install_dependencies(session, name="cog", opts=opts, include_editable_package=True)
     session.run("cog", "-rP", "README.md", env={"COLUMNS": "90"})
 
 

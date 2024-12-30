@@ -3,7 +3,7 @@
 .DEFAULT_GOAL := help
 
 
-_PY_DEFAULT = 312
+_PY_DEFAULT = $(shell cat .python-version | sed "s/\.//")
 UVXRUN = uv run --no-config --frozen tools/uvxrun.py
 UVXRUN_OPTS = -r requirements/lock/py$(_PY_DEFAULT)-uvxrun-tools.txt -v
 UVXRUN_NO_PROJECT = uv run --with "packaging" --no-project tools/uvxrun.py
@@ -258,5 +258,6 @@ tuna-import	: ## Analyze load time for module
 
 .PHONY: cog-readme
 cog-readme: ## apply cog to README.md
-	COLUMNS=90 uvx --from=cogapp cog -rP README.md
+	nox -s cog
+	# COLUMNS=90 uvx --from=cogapp cog -rP README.md
 	pre-commit run markdownlint --files README.md

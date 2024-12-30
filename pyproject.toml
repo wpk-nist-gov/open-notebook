@@ -33,7 +33,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
 ]
-# version = "0.1.1.dev"
+# version = "0.1.0"
 dynamic = [
     "readme",
     "version",
@@ -69,6 +69,7 @@ docs = [
     "sphinx-copybutton",
     "sphinxcontrib-spelling",
 ]
+cog = [ "cogapp" ]
 dev-extras = [
     "nox>=2024.4.15",
     "pytest-accept",
@@ -92,7 +93,7 @@ uvxrun-tools = [
     "grayskull>=2.5.3",
     "nbqa>=1.8.4",
     "pre-commit",
-    "pyproject2conda>=0.15.0",
+    "pyproject2conda>=0.16.0",
     "pyright>=1.1.391",
     "scriv",
     "twine>=5.0.0",
@@ -139,8 +140,6 @@ lint.select = [
 ]
 lint.ignore = [
     # * Annotations
-    "ANN101", # - Leads to issues with methods and self
-    "ANN102", # - Leads to issues with classmethods and cls
     "ANN401", # - Any ok sometimes
     # * These conflict with formatter
     "COM", # - flake8-commas, formatter should take care of this?
