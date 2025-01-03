@@ -7,12 +7,7 @@
 # You should not manually edit this file.
 # Instead edit the corresponding pyproject.toml file.
 #
-channels:
-  - conda-forge
-dependencies:
-  - python=3.10
-  - pytest
-  - pytest-cov
-  - pytest-sugar
-  - pytest-xdist
-  - pip
+pytest
+pytest-cov
+pytest-sugar
+pytest-xdist
