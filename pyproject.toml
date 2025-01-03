@@ -86,8 +86,8 @@ typing = [
     { include-group = "uvxrun" },
 ]
 # Anything needed to run tools/uvxrun.py
-uvxrun = [ "packaging" ]
 # NOTE: uvxrun-tools defined explicitly in tool.pyproject2conda.envs.uvxrun-tools
+uvxrun = [ "packaging" ]
 
 [tool.hatch.version]
 source = "vcs"
@@ -354,17 +354,27 @@ user_config = "config/userconfig.toml"
 template_python = "requirements/py{py}-{env}"
 template = "requirements/{env}"
 python = "default"
-channels = [ "conda-forge" ]
-style = [ "yaml" ]
-default_envs = [
-    "test",
-    "dev",
-]
-deps = [ "pip" ]
+channels = "conda-forge"
+style = "requirements"
+deps = "pip"
 
 [tool.pyproject2conda.dependencies]
 pytest-accept = { pip = true }
-scriv = { pip = true }
+
+[tool.pyproject2conda.envs.dev]
+groups = "dev"
+style = "yaml"
+
+[tool.pyproject2conda.envs.test]
+groups = "test"
+style = "yaml"
+python = "all"
+
+[tool.pyproject2conda.envs.test-extras]
+groups = [ "test-extras" ]
+style = "yaml"
+skip_package = true
+python = "all"
 
 [tool.pyproject2conda.envs.uvxrun-tools]
 reqs = [
@@ -379,18 +389,7 @@ reqs = [
     "twine>=5.0.0",
 ]
 groups = [ "mypy" ]
-style = "requirements"
 skip_package = true
-
-[tool.pyproject2conda.envs.test-extras]
-groups = [ "test-extras" ]
-style = [ "requirements", "yaml" ]
-skip_package = true
-python = "all"
-
-[[tool.pyproject2conda.overrides]]
-envs = [ "test" ]
-python = "all"
 
 # * uv -------------------------------------------------------------------------
 
