@@ -354,12 +354,8 @@ user_config = "config/userconfig.toml"
 template_python = "requirements/py{py}-{env}"
 template = "requirements/{env}"
 python = "default"
-channels = [
-    "conda-forge",
-]
-style = [
-    "yaml",
-]
+channels = [ "conda-forge" ]
+style = [ "yaml" ]
 default_envs = [
     "test",
     "dev",

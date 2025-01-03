@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 from .utils import MISSING, get_in
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
-    from typing import Any, Callable
+    from collections.abc import Callable, Iterable, Sequence
+    from typing import Any
 
     from ._typing import MISSING_TYPE
     from ._typing_compat import Self
