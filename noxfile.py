@@ -203,6 +203,7 @@ class SessionParams(DataclassParser):
             "mypy",
             "pyright",
             "pytype",
+            "pylint",
             "all",
             "mypy-notebook",
             "pyright-notebook",
@@ -780,7 +781,7 @@ def lint(
 # ** type checking
 @nox.session(name="typing", **ALL_KWS)
 @add_opts
-def typing(  # noqa: C901
+def typing(  # noqa: C901, PLR0912
     session: nox.Session,
     opts: SessionParams,
 ) -> None:
@@ -829,6 +830,8 @@ def typing(  # noqa: C901
             run("mypy", "--color-output")
         elif c == "pyright":
             run("pyright")
+        elif c == "pylint":
+            session.run("pylint", "src")
         else:
             session.log(f"Skipping unknown command {c}")
 

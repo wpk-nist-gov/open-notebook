@@ -82,6 +82,7 @@ test-extras = [
     "pytest-xdist",
 ]
 typing = [
+    "pylint",
     "pytest",
     { include-group = "uvxrun" },
 ]

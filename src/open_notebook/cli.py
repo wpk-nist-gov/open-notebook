@@ -6,6 +6,7 @@ Program `open-notebook` (:mod:`~open_notebook.cli`)
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -17,8 +18,6 @@ from .config import DEFAULT_PARAMS
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-
-import logging
 
 # * Logging
 FORMAT = "[%(name)s - %(levelname)s] %(message)s"
@@ -35,10 +34,12 @@ def get_parser() -> argparse.ArgumentParser:
         prog="open-notebook",
         description="Program to open jupyter notebooks from central notebook server.",
         epilog="""
-        You can set options with the configuration files ".open-notebook.toml".  Configuration
-        files are found in the current directory, git root (if in a git tracked tree), and the home directory.
-        Note that all these files are considered, in order.  That is, you could override a single value in the
-        current directory, and the rest would be inherited from, in order, git root and then the home directory.
+        You can set options with the configuration files ".open-notebook.toml".
+        Configuration files are found in the current directory, git root (if in
+        a git tracked tree), and the home directory. Note that all these files
+        are considered, in order. That is, you could override a single value in
+        the current directory, and the rest would be inherited from, in order,
+        git root and then the home directory.
         """,
     )
 

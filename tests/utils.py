@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,3 +40,19 @@ def run_inside_dir(
     with inside_dir(dirpath):
         logger.info("Run: %s", command)
         return subprocess.run(shlex.split(command), check=True, stdout=subprocess.PIPE)  # noqa: S603
+
+
+def base_options(
+    host: str = "localhost",
+    port: str = "8888",
+    root: str = ".",
+    dir_prefix: str = "tree",
+    file_prefix: str = "notebooks",
+) -> dict[str, Any]:
+    return {
+        "host": host,
+        "port": port,
+        "root": Path(root),
+        "dir_prefix": dir_prefix,
+        "file_prefix": file_prefix,
+    }

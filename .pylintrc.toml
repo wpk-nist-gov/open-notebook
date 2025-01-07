@@ -1,0 +1,73 @@
+# [tool.pylint]
+# master.py-version = "3.11"
+# # master.ignore-paths= ["src/sp_repo_review/_version.py"]
+# reports.output-format = "colorized"
+# similarities.ignore-imports = "yes"
+# messages_control.disable = [
+#     "design",
+#     "fixme",
+#     "line-too-long",
+#     "wrong-import-position",
+#     "redefined-builtin",
+#     "missing-module-docstring",
+#     "missing-class-docstring",
+#     "missing-function-docstring",
+#     "invalid-name",
+#     "redefined-outer-name",
+#     "no-member",  # better handled by mypy, etc.
+#     "import-outside-toplevel",
+#     "consider-using-f-string",
+#     "protected-access", # pyright gets this
+# ]
+[tool.pylint.similarities]
+ignore-imports = "yes"
+
+[tool.pylint.reports]
+output-format = "colorized"
+
+[tool.pylint.basic]
+no-docstring-rgx = "__.*__|test[A-Z_].*|_decorator|_wrapper|_.*__.*"
+
+[tool.pylint.classes]
+defining-attr-methods = [
+    "__init__",
+    "__new__",
+    "__post_init__",
+    "setUp",
+    "reset",
+    "_reset",
+]
+
+[tool.pylint.design]
+max-args = 15
+max-attributes = 40
+max-bool-expr = 5
+max-branches = 50
+max-locals = 50
+max-parents = 12
+max-public-methods = 500
+max-positional-arguments = 15
+max-returns = 20
+max-statements = 150
+min-public-methods = 0
+
+[tool.pylint."messages control"]
+enable = ["useless-suppression"]
+disable = [
+    # defer to ruff
+    "line-too-long",
+    "missing-module-docstring",
+    "missing-function-docstring",
+    "redefined-outer-name",
+    # Questionable things, but it's ok, I don't need to be told:
+    "import-outside-toplevel",
+    "superfluous-parens",
+    # Messages that are noisy for now, eventually maybe we'll turn them on:
+    "invalid-name",
+    # "protected-access",
+    # "unspecified-encoding",
+    "consider-using-f-string",
+    # "duplicate-code",
+    # "cyclic-import",
+
+]

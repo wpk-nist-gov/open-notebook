@@ -1,3 +1,4 @@
+# pylint: disable=unused-argument
 from __future__ import annotations
 
 import locale
@@ -11,7 +12,7 @@ import pytest
 from open_notebook import cli
 from open_notebook.utils import MISSING
 
-from .utils import run_inside_dir
+from .utils import base_options, run_inside_dir
 
 if TYPE_CHECKING:
     import argparse
@@ -118,22 +119,6 @@ def test_version() -> None:
     import open_notebook
 
     assert cli.get_version_string() == f"open-notebook, {open_notebook.__version__}"
-
-
-def base_options(
-    host: str = "localhost",
-    port: str = "8888",
-    root: str = ".",
-    dir_prefix: str = "tree",
-    file_prefix: str = "notebooks",
-) -> dict[str, Any]:
-    return {
-        "host": host,
-        "port": port,
-        "root": Path(root),
-        "dir_prefix": dir_prefix,
-        "file_prefix": file_prefix,
-    }
 
 
 def test_get_options(example_path: Path, home_path: Path) -> None:
@@ -249,7 +234,6 @@ def test_run(example_path: Path) -> None:
 
 
 def test_main(example_path: Path) -> None:
-    import shlex
     from subprocess import check_call
 
     out = check_call(shlex.split("python -m open_notebook --help"))  # noqa: S603
