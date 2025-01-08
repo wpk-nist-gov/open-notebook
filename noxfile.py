@@ -1,3 +1,4 @@
+# pylint: disable=wrong-import-position
 """Config file for nox."""
 
 # * Imports ----------------------------------------------------------------------------
@@ -6,16 +7,8 @@ from __future__ import annotations
 import shlex
 import shutil
 import sys
-from functools import lru_cache, partial, wraps
-
-from nox.virtualenv import CondaEnv
-
-# Should only use on python version > 3.10
-if sys.version_info < (3, 10):
-    msg = "python>=3.10 required"
-    raise RuntimeError(msg)
-
 from dataclasses import dataclass
+from functools import lru_cache, partial, wraps
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -25,10 +18,16 @@ from typing import (
     TypedDict,
 )
 
-# fmt: off
+import nox
+from nox.virtualenv import CondaEnv
+
 sys.path.insert(0, ".")
 from tools import uvxrun
-from tools.dataclass_parser import DataclassParser, add_option, option
+from tools.dataclass_parser import (
+    DataclassParser,
+    add_option,
+    option,
+)
 from tools.noxtools import (
     check_for_change_manager,
     combine_list_list_str,
@@ -41,16 +40,17 @@ from tools.noxtools import (
 
 sys.path.pop(0)
 
-# make sure these after
-import nox  # type: ignore[unused-ignore,import]
-
-# fmt: on
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Sequence
 
     from nox import Session
 
+
+# Should only use on python version > 3.10
+if sys.version_info < (3, 10):
+    msg = "python>=3.10 required"
+    raise RuntimeError(msg)
 
 # * Names ------------------------------------------------------------------------------
 
@@ -793,10 +793,10 @@ def typing(  # noqa: C901, PLR0912
 
     cmd = opts.typing or []
     if not opts.typing_run and not opts.typing_run_internal and not cmd:
-        cmd = ["mypy", "pyright"]
+        cmd = ["mypy", "pyright", "pylint"]
 
     if "all" in cmd:
-        cmd = ["mypy", "pyright", "pytype"]
+        cmd = ["mypy", "pyright", "pylint", "pytype"]
 
     # set the cache directory for mypy
     session.env["MYPY_CACHE_DIR"] = str(Path(session.create_tmp()) / ".mypy_cache")
@@ -831,7 +831,14 @@ def typing(  # noqa: C901, PLR0912
         elif c == "pyright":
             run("pyright")
         elif c == "pylint":
-            session.run("pylint", "src")
+            session.run(
+                "pylint",
+                # A bit dangerous, but needed to allow pylint
+                # to work across versions.
+                "--disable=unrecognized-option",
+                "src",
+                "tests",
+            )
         else:
             session.log(f"Skipping unknown command {c}")
 
@@ -914,7 +921,7 @@ def get_package_wheel(
 
         # save that this was called:
         if reuse:
-            get_package_wheel._called = True  # type: ignore[attr-defined]  # noqa: SLF001
+            get_package_wheel._called = True  # type: ignore[attr-defined]  # noqa: SLF001  # pylint: disable=protected-access
 
     paths = list(dist_location.glob("*.whl"))
     if len(paths) != 1:
@@ -1091,8 +1098,6 @@ def _create_doc_examples_symlinks(session: nox.Session, clean: bool = True) -> N
 
     root = Path("./docs/examples/")
     if clean:
-        import shutil
-
         shutil.rmtree(root / "usage", ignore_errors=True)
 
     # get all md files
