@@ -22,7 +22,7 @@ def inside_dir(dirpath: str | Path) -> Iterator[None]:
     :param dirpath: String, path of the directory the command is being run.
     """
     old_path = Path.cwd()
-    try:
+    try:  # pylint: disable=too-many-try-statements
         os.chdir(dirpath)
         yield
     finally:

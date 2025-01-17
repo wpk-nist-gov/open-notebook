@@ -9,8 +9,8 @@ import enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
-    from typing import Any, Callable
+    from collections.abc import Callable, Mapping, Sequence
+    from typing import Any
 
 
 # taken from https://github.com/python-attrs/attrs/blob/main/src/attr/_make.py

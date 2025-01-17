@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from typing import TypeVar
 
     T = TypeVar("T")
-    YieldFixture = Generator[T, None, None]
+    YieldFixture = Generator[T]
 
 
 @pytest.fixture

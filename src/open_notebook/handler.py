@@ -52,7 +52,8 @@ class JupyterUrlHandler:
             paths = [paths]
 
         urls: list[str] = []
-        for path in map(Path, paths):
+        for p in paths:
+            path = Path(p)
             if path.is_dir():
                 url = self._path_to_url(path, modifier=self.dir_prefix, suffix=None)
             elif path.is_file():

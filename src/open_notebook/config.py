@@ -42,8 +42,7 @@ def get_git_root_path(cwd: str | Path | None = None) -> Path | None:
         cwd=cwd,
         check=False,
     )
-    out = result.stdout.decode().rstrip()
-    if out:
+    if out := result.stdout.decode().rstrip():
         return Path(out).absolute()
     return None
 
@@ -125,8 +124,7 @@ class Config:
     ) -> Any:
         """Get value from config(s)"""
         for data in self.data:
-            out = get_in(keys, data, default=MISSING)
-            if out is not MISSING:
+            if (out := get_in(keys, data, default=MISSING)) is not MISSING:
                 return out
 
         # else use default
@@ -170,10 +168,8 @@ class Config:
         if passed is not MISSING:
             return passed
 
-        if section is not None:
-            out = self.get(section, key)
-            if out is not MISSING:
-                return out
+        if section is not None and (out := self.get(section, key)) is not MISSING:
+            return out
 
         # if default is MISSING, fallback to DEFAULT_PARAMS
         if default is MISSING:
@@ -241,7 +237,7 @@ class Config:
     def to_options_dict(self, section: str | None = None, **kws: Any) -> dict[str, Any]:
         """Convert options to dictionary."""
         out: dict[str, Any] = {}
-        for k in ["host", "port", "root", "dir_prefix", "file_prefix"]:
+        for k in ("host", "port", "root", "dir_prefix", "file_prefix"):
             out[k] = getattr(self, k)(section=section, passed=kws.get(k, MISSING))
         return out
 
@@ -260,7 +256,8 @@ class Config:
             paths = [paths]  # pragma: no cover
 
         data: list[dict[str, Any]] = []
-        for path in map(Path, paths):
+        for p in paths:
+            path = Path(p)
             with path.open("rb") as f:
                 data.append(tomli.load(f))
 
@@ -293,11 +290,9 @@ class Config:
         """Create from config file(s)."""
         config_path_dict = get_config_files(cwd=cwd, home=home, config_name=name)
 
-        paths: list[str | Path] = []
-        for k in ["cwd", "git", "home"]:
-            v = config_path_dict[k]
-            if v is not None:
-                paths.append(v)
+        paths: list[str | Path] = [
+            v for k in ("cwd", "git", "home") if (v := config_path_dict[k]) is not None
+        ]
         return cls.from_paths(paths, default_params=default_params)
 
 
@@ -333,6 +328,7 @@ def create_config(
 
     from textwrap import dedent
 
+    # pylint: disable=empty-comment
     out = f"""\
     # This is the config file for "open-notebook"
     #

@@ -113,7 +113,7 @@ def set_verbosity_level(logger: logging.Logger, verbosity: int | None) -> None:
 
     if verbosity < 0:
         level = logging.ERROR
-    elif verbosity == 0:
+    elif not verbosity:
         level = logging.WARNING
     elif verbosity == 1:
         level = logging.INFO
@@ -157,7 +157,7 @@ def create_config(
     """Create configuration."""
     from open_notebook import config
 
-    if (n := len(paths)) == 0:
+    if not (n := len(paths)):
         p = None
     elif n == 1:
         p = paths[0]

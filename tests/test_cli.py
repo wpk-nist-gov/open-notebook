@@ -45,7 +45,7 @@ def base_cli_options(
     dry: bool = False,
     paths: list[Path | str] | None = None,
 ) -> dict[str, Any]:
-    paths_verified = [] if paths is None else list(map(Path, paths))
+    paths_verified = [] if paths is None else [Path(p) for p in paths]
 
     return {
         "host": host,
@@ -100,10 +100,10 @@ def test_verbosity() -> None:
     import logging
 
     cli.main([])
-    assert cli.logger.level == 0
+    assert not cli.logger.level
 
     cli.set_verbosity_level(cli.logger, -1)
-    assert cli.logger.level == logging.ERROR
+    assert cli.logger.level == logging.ERROR  # type: ignore[comparison-overlap]
 
     cli.set_verbosity_level(cli.logger, 0)
     assert cli.logger.level == logging.WARNING
@@ -223,13 +223,13 @@ def test_open(example_path: Path) -> None:
 def test_run(example_path: Path) -> None:
     from open_notebook import __version__
 
-    for s in [
+    for s in (
         "open-notebook --version",
         "nopen --version",
-    ]:
+    ):
         out = run_inside_dir(s)
 
-        assert out.returncode == 0
+        assert not out.returncode
         assert out.stdout.decode().strip() == f"open-notebook, {__version__}"
 
 
@@ -238,4 +238,4 @@ def test_main(example_path: Path) -> None:
 
     out = check_call(shlex.split("python -m open_notebook --help"))  # noqa: S603
 
-    assert out == 0
+    assert not out
