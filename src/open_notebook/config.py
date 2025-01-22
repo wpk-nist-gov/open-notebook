@@ -250,7 +250,7 @@ class Config:
         default_params: Mapping[str, Any] | None = None,
     ) -> Self:
         """Create from path(s)."""
-        import tomli
+        from ._compat import tomllib
 
         if isinstance(paths, (str, Path)):
             paths = [paths]  # pragma: no cover
@@ -259,7 +259,7 @@ class Config:
         for p in paths:
             path = Path(p)
             with path.open("rb") as f:
-                data.append(tomli.load(f))
+                data.append(tomllib.load(f))
 
         return cls(data, default_params=default_params)
 
@@ -270,12 +270,12 @@ class Config:
         default_params: Mapping[str, Any] | None = None,
     ) -> Self:
         """Create from string(s)."""
-        import tomli
+        from ._compat import tomllib
 
         if isinstance(strings, str):
             strings = [strings]
 
-        data: list[dict[str, Any]] = [tomli.loads(string) for string in strings]
+        data: list[dict[str, Any]] = [tomllib.loads(string) for string in strings]
 
         return cls(data, default_params=default_params)
 

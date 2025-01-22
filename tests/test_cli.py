@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from open_notebook import cli
+from open_notebook._compat import tomllib  # noqa: PLC2701
 from open_notebook.utils import MISSING
 
 from .utils import base_options, run_inside_dir
@@ -175,11 +176,9 @@ def test_create_config0(example_path: Path) -> None:
 
     cli.create_config(options=options, paths=[Path()])
 
-    import tomli
-
     # with open(".open-notebook.toml", "rb") as f:
     with Path(".open-notebook.toml").open("rb") as f:
-        data = tomli.load(f)
+        data = tomllib.load(f)
 
     assert data == options
 
@@ -195,10 +194,8 @@ def test_create_config1(example_path: Path) -> None:
 
     cli.create_config(options=options, paths=[], home=".")
 
-    import tomli
-
     with Path(".open-notebook.toml").open("rb") as f:
-        data = tomli.load(f)
+        data = tomllib.load(f)
 
     assert data == options
 
