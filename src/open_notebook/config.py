@@ -2,20 +2,22 @@
 Configuration file routines (:mod:`~open_notebook.config`)
 ==========================================================
 """
+
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Mapping
+from typing import TYPE_CHECKING
 
 from .utils import MISSING, get_in
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterable
-
-    from typing_extensions import Self
+    from collections.abc import Callable, Iterable, Sequence
+    from typing import Any
 
     from ._typing import MISSING_TYPE
+    from ._typing_compat import Self
 
 
 # * Parameters
@@ -31,16 +33,18 @@ DEFAULT_PARAMS = {
 
 
 def get_git_root_path(cwd: str | Path | None = None) -> Path | None:
+    """Get root path of git repo."""
     if cwd:
         cwd = Path(cwd).expanduser().absolute()
-    result = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"], capture_output=True, cwd=cwd
+    result = subprocess.run(  # noqa: S603
+        ["git", "rev-parse", "--show-toplevel"],  # noqa: S607
+        capture_output=True,
+        cwd=cwd,
+        check=False,
     )
-    out = result.stdout.decode().rstrip()
-    if out:
+    if out := result.stdout.decode().rstrip():
         return Path(out).absolute()
-    else:
-        return None
+    return None
 
 
 def get_config_files(
@@ -62,7 +66,6 @@ def get_config_files(
     config_name : str, default=".open-notebook.ini"
     Name of config file
     """
-
     out: dict[str, Path | None] = {}
 
     cwd = Path(cwd).expanduser().absolute()
@@ -76,8 +79,7 @@ def get_config_files(
         p = d / config_name
         if p.exists():
             return p.absolute()
-        else:
-            return None
+        return None
 
     # check current directory
     out["cwd"] = _has_config(cwd)
@@ -101,26 +103,18 @@ class Config:
 
     def __init__(
         self,
-        data: Mapping[str, Any] | Iterable[Mapping[str, Any]],
+        data: Mapping[str, Any] | Sequence[Mapping[str, Any]],
         default_params: Mapping[str, Any] | None = None,
     ) -> None:
         self.data: Iterable[Mapping[str, Any]]
         if isinstance(data, Mapping):
-            self.data = [data]  # pyright: ignore
+            self.data = [data]
         else:
             self.data = data
 
         if default_params is None:
             default_params = DEFAULT_PARAMS
         self.default_params = default_params
-
-    # def append(self, data: Mapping[str, Any], inplace: bool = False) -> Self:
-    #     if inplace:
-    #         self.data.append(data)
-    #         return self
-    #     else:
-    #         self.data + [data]
-    #         return type(self)(data)
 
     def get(
         self,
@@ -130,15 +124,13 @@ class Config:
     ) -> Any:
         """Get value from config(s)"""
         for data in self.data:
-            out = get_in(keys, data, default=MISSING)
-            if out is not MISSING:
+            if (out := get_in(keys, data, default=MISSING)) is not MISSING:
                 return out
 
         # else use default
         if factory is not None:
             return factory()  # pragma: no cover
-        else:
-            return default
+        return default
 
     def get_option(
         self,
@@ -173,14 +165,11 @@ class Config:
             Fallback value to return
 
         """
-
         if passed is not MISSING:
             return passed
 
-        elif section is not None:
-            out = self.get(section, key)
-            if out is not MISSING:
-                return out
+        if section is not None and (out := self.get(section, key)) is not MISSING:
+            return out
 
         # if default is MISSING, fallback to DEFAULT_PARAMS
         if default is MISSING:
@@ -189,14 +178,15 @@ class Config:
         # Fall back to top level or default_params
         return self.get(key, default=default, factory=factory)
 
-    ## * Options
+    # * Options
     def host(
         self,
         section: str | None = None,
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> str:
-        return self.get_option(  # type: ignore
+        """Host option."""
+        return self.get_option(  # type: ignore[no-any-return]
             section=section, key="host", passed=passed, default=default
         )
 
@@ -206,7 +196,8 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> str:
-        return self.get_option(  # type: ignore
+        """Port option."""
+        return self.get_option(  # type: ignore[no-any-return]
             section=section, key="port", passed=passed, default=default
         )
 
@@ -216,14 +207,9 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> Path:
-        return (
-            Path(
-                self.get_option(
-                    section=section, key="root", passed=passed, default=default
-                )
-            )
-            # .expanduser()
-            # .absolute()
+        """Root option."""
+        return Path(
+            self.get_option(section=section, key="root", passed=passed, default=default)
         )
 
     def dir_prefix(
@@ -232,7 +218,8 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> str:
-        return self.get_option(  # type: ignore
+        """Directory prefix option."""
+        return self.get_option(  # type: ignore[no-any-return]
             section=section, key="dir_prefix", passed=passed, default=default
         )
 
@@ -242,17 +229,19 @@ class Config:
         passed: Any = MISSING,
         default: str | MISSING_TYPE = MISSING,
     ) -> str:
-        return self.get_option(  # type: ignore
+        """File prefix option."""
+        return self.get_option(  # type: ignore[no-any-return]
             section=section, key="file_prefix", passed=passed, default=default
         )
 
     def to_options_dict(self, section: str | None = None, **kws: Any) -> dict[str, Any]:
+        """Convert options to dictionary."""
         out: dict[str, Any] = {}
-        for k in ["host", "port", "root", "dir_prefix", "file_prefix"]:
+        for k in ("host", "port", "root", "dir_prefix", "file_prefix"):
             out[k] = getattr(self, k)(section=section, passed=kws.get(k, MISSING))
         return out
 
-    ## * Factory
+    # * Factory
     # specialty stuff
     @classmethod
     def from_paths(
@@ -260,15 +249,17 @@ class Config:
         paths: str | Path | Iterable[str | Path],
         default_params: Mapping[str, Any] | None = None,
     ) -> Self:
-        import tomli
+        """Create from path(s)."""
+        from ._compat import tomllib
 
         if isinstance(paths, (str, Path)):
             paths = [paths]  # pragma: no cover
 
         data: list[dict[str, Any]] = []
-        for path in map(Path, paths):
+        for p in paths:
+            path = Path(p)
             with path.open("rb") as f:
-                data.append(tomli.load(f))
+                data.append(tomllib.load(f))
 
         return cls(data, default_params=default_params)
 
@@ -278,14 +269,14 @@ class Config:
         strings: str | Iterable[str],
         default_params: Mapping[str, Any] | None = None,
     ) -> Self:
-        import tomli
+        """Create from string(s)."""
+        from ._compat import tomllib
 
         if isinstance(strings, str):
             strings = [strings]
 
-        data: list[dict[str, Any]] = []
-        for string in strings:
-            data.append(tomli.loads(string))
+        data: list[dict[str, Any]] = [tomllib.loads(string) for string in strings]
+
         return cls(data, default_params=default_params)
 
     @classmethod
@@ -296,17 +287,16 @@ class Config:
         home: str | Path | None = None,
         default_params: Mapping[str, Any] | None = None,
     ) -> Self:
+        """Create from config file(s)."""
         config_path_dict = get_config_files(cwd=cwd, home=home, config_name=name)
 
-        paths: list[str | Path] = []
-        for k in ["cwd", "git", "home"]:
-            v = config_path_dict[k]
-            if v is not None:
-                paths.append(v)
+        paths: list[str | Path] = [
+            v for k in ("cwd", "git", "home") if (v := config_path_dict[k]) is not None
+        ]
         return cls.from_paths(paths, default_params=default_params)
 
 
-## * Create config
+# * Create config
 def create_config(
     host: str,
     port: str,
@@ -319,27 +309,26 @@ def create_config(
 ) -> None:
     """Create a configuration file."""
     if path is None:
-        if home is None:
-            home = Path.home()  # pragma: no cover
-        else:
-            home = Path(home).expanduser().absolute()
+        home = (
+            Path(home).expanduser().absolute() if home else Path.home()
+        )  # pragma: no cover
         path = home / CONFIG_FILE_NAME
     else:
         path = Path(path)
 
-        assert (
-            path.is_dir()
-        ), f"Can only specify a directory to place the config file {CONFIG_FILE_NAME} into"
+        if not path.is_dir():
+            msg = f"Can only specify a directory to place the config file {CONFIG_FILE_NAME} into"  # pragma: no cover
+            raise OSError(msg)
 
-        path = path / CONFIG_FILE_NAME
+        path /= CONFIG_FILE_NAME
 
     if path.exists() and not overwrite:
-        raise ValueError(
-            f"file {path} exists.  Either remove this file or specify overwrite"
-        )
+        msg = f"file {path} exists.  Either remove this file or specify overwrite"
+        raise ValueError(msg)
 
     from textwrap import dedent
 
+    # pylint: disable=empty-comment
     out = f"""\
     # This is the config file for "open-notebook"
     #

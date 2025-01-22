@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import logging
 import os
 import shlex
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
-import logging
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +22,7 @@ def inside_dir(dirpath: str | Path) -> Iterator[None]:
     :param dirpath: String, path of the directory the command is being run.
     """
     old_path = Path.cwd()
-    try:
+    try:  # pylint: disable=too-many-try-statements
         os.chdir(dirpath)
         yield
     finally:
@@ -32,8 +35,24 @@ def run_inside_dir(
     """Run a command from inside a given directory, returning the exit status"""
 
     if dirpath is None:
-        dirpath = Path(".")
+        dirpath = Path()
 
     with inside_dir(dirpath):
-        logger.info(f"Run: {command}")
-        return subprocess.run(shlex.split(command), check=True, stdout=subprocess.PIPE)
+        logger.info("Run: %s", command)
+        return subprocess.run(shlex.split(command), check=True, stdout=subprocess.PIPE)  # noqa: S603
+
+
+def base_options(
+    host: str = "localhost",
+    port: str = "8888",
+    root: str = ".",
+    dir_prefix: str = "tree",
+    file_prefix: str = "notebooks",
+) -> dict[str, Any]:
+    return {
+        "host": host,
+        "port": port,
+        "root": Path(root),
+        "dir_prefix": dir_prefix,
+        "file_prefix": file_prefix,
+    }

@@ -1,31 +1,25 @@
 {
   "template": "https://github.com/usnistgov/cookiecutter-nist-python.git",
-  "commit": "97b9e2078adb002d15d047305d2b03d6ae1da08a",
+  "commit": "46c5737a3719fdefea1fc843af5c136d99894d87",
   "checkout": "develop",
   "context": {
     "cookiecutter": {
+      "project_name": "open-notebook",
+      "project_slug": "open_notebook",
+      "project_short_description": "Command line program to open jupyter notebooks from single server",
       "full_name": "William P. Krekelberg",
       "email": "wpk@nist.gov",
       "github_username": "usnistgov",
       "pypi_username": "wpk-nist",
       "conda_channel": "conda-forge",
-      "project_name": "open-notebook",
-      "project_slug": "open_notebook",
-      "_copy_without_render": [
-        "*.html",
-        "docs/_templates/*.rst",
-        "docs/_templates/autosummary/*.rst",
-        "docs/_templates/autodocsumm/*.rst",
-        "docs/_static/css/*",
-        "docs/_static/js/*",
-        "changelog.d/templates/*.j2",
-        "changelog.d/templates/auto-changelog/*.jinja2"
-      ],
-      "project_short_description": "Command line program to open jupyter notebooks from single server",
-      "command_line_interface": "Argparse",
-      "sphinx_use_autodocsumm": "y",
+      "command_line_interface": "argparse",
+      "sphinx_use_autodocsumm": true,
       "sphinx_theme": "sphinx_book_theme",
-      "_template": "https://github.com/usnistgov/cookiecutter-nist-python.git"
+      "year": "2023",
+      "__answers": "",
+      "_copy_without_render": [],
+      "_template": "https://github.com/usnistgov/cookiecutter-nist-python.git",
+      "_commit": "46c5737a3719fdefea1fc843af5c136d99894d87"
     }
   },
   "directory": null

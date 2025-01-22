@@ -1,16 +1,16 @@
+# pylint: disable=unused-argument
 from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
 
 from open_notebook import config
 
-import pytest
-from pathlib import Path
-
-from typing import Any
-
-from .utils import inside_dir
+from .utils import base_options, inside_dir
 
 
-def test_Config_simple() -> None:
+def test_config_simple() -> None:
     c = config.Config(data={"hello": "there"})
 
     assert c.get("hello") == "there"
@@ -19,22 +19,6 @@ def test_Config_simple() -> None:
     from open_notebook.utils import get_in
 
     assert get_in(("hello"), {}, factory=list) == []
-
-
-def base_options(
-    host: str = "localhost",
-    port: str = "8888",
-    root: str = ".",
-    dir_prefix: str = "tree",
-    file_prefix: str = "notebooks",
-) -> dict[str, Any]:
-    return dict(
-        host=host,
-        port=port,
-        root=Path(root),
-        dir_prefix=dir_prefix,
-        file_prefix=file_prefix,
-    )
 
 
 def test_base() -> None:
@@ -49,6 +33,25 @@ def test_base() -> None:
     assert base_options(root="~/") == c.to_options_dict(root="~/")
     assert base_options(dir_prefix="tr") == c.to_options_dict(dir_prefix="tr")
     assert base_options(file_prefix="no") == c.to_options_dict(file_prefix="no")
+
+    new_defaults = {
+        "host": "thing",
+        "port": "8889",
+        "root": "~/",
+        "dir_prefix": "tr",
+        "file_prefix": "no",
+    }
+    c = config.Config([], default_params=new_defaults)
+
+    assert c.host() == new_defaults["host"]
+    assert c.port() == new_defaults["port"]
+    assert c.root() == Path(new_defaults["root"])
+    assert c.dir_prefix() == new_defaults["dir_prefix"]
+    assert c.file_prefix() == new_defaults["file_prefix"]
+
+    assert c.get_option(key="port", passed="hello") == "hello"
+    assert c.get_option(key="port") == "8889"
+    assert c.get_option(key="port", default="9999") == "9999"
 
 
 def test_git_root(example_path: Path) -> None:
@@ -98,7 +101,7 @@ def test_find_config_with_config(
 ) -> None:
     out = config.get_config_files(home=home_path)
 
-    assert out["cwd"] == Path(".").absolute() / config.CONFIG_FILE_NAME
+    assert out["cwd"] == Path().absolute() / config.CONFIG_FILE_NAME
     assert out["git"] is None
     assert out["home"] == home_path / config.CONFIG_FILE_NAME
 
@@ -109,6 +112,20 @@ def test_find_config_with_git(example_path_with_git: Path, home_path: Path) -> N
     assert out["cwd"] is None
     assert out["git"] is None
     assert out["home"] == home_path / config.CONFIG_FILE_NAME
+
+
+def test_create_config_no_parent(example_path_with_git_config: Path) -> None:
+    path = example_path_with_git_config / "a" / "thing" / "test"
+
+    with pytest.raises(OSError):
+        config.create_config(
+            host="localhost",
+            port="8888",
+            root="~/hello",
+            dir_prefix="tr",
+            file_prefix="no",
+            path=path,
+        )
 
 
 def test_find_config_with_git_config(

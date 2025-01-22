@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import locale
 import shlex
 import subprocess
 import textwrap
 from functools import lru_cache
+from pathlib import Path
 
 
 def wrap_command(cmd: str) -> str:
+    """Wrap command at 80 characters."""
     x = textwrap.wrap(cmd.strip(), 80)
 
     if len(cmd) > 1:
@@ -20,9 +23,9 @@ def wrap_command(cmd: str) -> str:
 
 @lru_cache
 def get_pyproject(path: str) -> list[str]:
-    with open(path) as f:
-        lines = [_.strip() for _ in f]
-    return lines
+    """Read pyproject."""
+    with Path(path).open(encoding=locale.getpreferredencoding(False)) as f:
+        return [_.strip() for _ in f]
 
 
 def run_command(
@@ -31,6 +34,7 @@ def run_command(
     include_cmd: bool = True,
     bounds: tuple[int | None, int | None] | None = None,
 ) -> None:
+    """Run command as subprocess."""
     args = shlex.split(cmd)
     output = subprocess.check_output(args)
 
@@ -39,9 +43,9 @@ def run_command(
     if bounds is not None:
         x = total.split("\n")[bounds[0] : bounds[1]]
         if bounds[0] is not None:
-            x = ["...\n"] + x
+            x = ["...\n", *x]
         if bounds[1] is not None:
-            x = x + ["\n ...\n"]
+            x = [*x, "\n ...\n"]
 
         total = "\n".join(x)
 
@@ -53,7 +57,7 @@ def run_command(
     if wrapper:
         total = f"```{wrapper}\n" + total + "```\n"
 
-    print(total)
+    print(total)  # noqa: T201
 
 
 def cat_lines(
@@ -63,6 +67,7 @@ def cat_lines(
     begin_dot: bool = False,
     end_dot: bool = False,
 ) -> None:
+    """Echo lines of file."""
     lines = get_pyproject(path)
 
     begin_dot = begin_dot or begin is not None
@@ -76,10 +81,10 @@ def cat_lines(
     output = "\n".join(lines[slice(begin, end)])
 
     if begin_dot:
-        output = "# ...\n" + output
+        output += "# ...\n"
 
     if end_dot:
-        output = output + "\n# ..."
+        output += "\n# ..."
 
     output = "\n```toml\n" + output + "\n```\n"
-    print(output)
+    print(output)  # noqa: T201

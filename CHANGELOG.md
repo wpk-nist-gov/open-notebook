@@ -7,7 +7,7 @@ Changelog for `open-notebook`
 
 ## Unreleased
 
-[changelog.d]: https://github.com/usnistgov/open-notebook/changelog.d
+[changelog.d]: https://github.com/usnistgov/open-notebook/tree/main/changelog.d
 
 See the fragment files in [changelog.d]
 <!-- prettier-ignore-end -->

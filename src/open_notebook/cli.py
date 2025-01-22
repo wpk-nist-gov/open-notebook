@@ -6,6 +6,7 @@ Program `open-notebook` (:mod:`~open_notebook.cli`)
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -15,14 +16,12 @@ from open_notebook.utils import MISSING
 from .config import DEFAULT_PARAMS
 
 if TYPE_CHECKING:
-    from typing import Sequence
+    from collections.abc import Sequence
 
-
-import logging
 
 # * Logging
 FORMAT = "[%(name)s - %(levelname)s] %(message)s"
-logging.basicConfig(level=logging.WARN, format=FORMAT)
+logging.basicConfig(level=logging.WARNING, format=FORMAT)
 logger = logging.getLogger(__name__)
 
 
@@ -30,14 +29,17 @@ logger = logging.getLogger(__name__)
 
 
 def get_parser() -> argparse.ArgumentParser:
+    """Get base parser."""
     parser = argparse.ArgumentParser(
         prog="open-notebook",
         description="Program to open jupyter notebooks from central notebook server.",
         epilog="""
-        You can set options with the configuration files ".open-notebook.toml".  Configuration
-        files are found in the current directory, git root (if in a git tracked tree), and the home directory.
-        Note that all these files are considered, in order.  That is, you could override a single value in the
-        current directory, and the rest would be inherited from, in order, git root and then the home directory.
+        You can set options with the configuration files ".open-notebook.toml".
+        Configuration files are found in the current directory, git root (if in
+        a git tracked tree), and the home directory. Note that all these files
+        are considered, in order. That is, you could override a single value in
+        the current directory, and the rest would be inherited from, in order,
+        git root and then the home directory.
         """,
     )
 
@@ -105,12 +107,14 @@ def get_parser() -> argparse.ArgumentParser:
 
 
 def set_verbosity_level(logger: logging.Logger, verbosity: int | None) -> None:
+    """Set verbosity level."""
     if verbosity is None:
         return
-    elif verbosity < 0:
+
+    if verbosity < 0:
         level = logging.ERROR
-    elif verbosity == 0:
-        level = logging.WARN
+    elif not verbosity:
+        level = logging.WARNING
     elif verbosity == 1:
         level = logging.INFO
     else:
@@ -123,6 +127,7 @@ def set_verbosity_level(logger: logging.Logger, verbosity: int | None) -> None:
 
 
 def get_version_string() -> str:
+    """Get version string."""
     from open_notebook import __version__
 
     return f"open-notebook, {__version__}"
@@ -133,12 +138,13 @@ def get_options(
     section: str | None = None,
     home: str | Path | None = None,
 ) -> dict[str, Any]:
+    """Get option."""
     from open_notebook import config
 
     options = config.Config.from_config_files(home=home).to_options_dict(
         section=section, **vars(cli_options)
     )
-    logger.debug(f"options: {options}")
+    logger.debug("options: %s", options)
     return options
 
 
@@ -148,19 +154,22 @@ def create_config(
     overwrite: bool = False,
     home: str | Path | None = None,
 ) -> None:
+    """Create configuration."""
     from open_notebook import config
 
-    if (n := len(paths)) == 0:
+    if not (n := len(paths)):
         p = None
     elif n == 1:
         p = paths[0]
     else:
-        raise ValueError("can specify zero or one path for config file")
+        msg = "can specify zero or one path for config file"
+        raise ValueError(msg)
 
     config.create_config(**options, overwrite=overwrite, path=p, home=home)
 
 
 def open_paths(options: dict[str, Any], paths: list[Path], dry: bool = False) -> None:
+    """Open path as url."""
     from open_notebook import handler
 
     h = handler.JupyterUrlHandler(**options)
@@ -168,26 +177,24 @@ def open_paths(options: dict[str, Any], paths: list[Path], dry: bool = False) ->
     urls = h.paths_to_urls(paths)
 
     for url in urls:
-        logger.info(f"opening: {url}")
+        logger.info("opening: %s", url)
         if not dry:
             handler.open_urls(url)  # pragma: no cover
 
 
 def main(args: Sequence[str] | None = None, home: str | Path | None = None) -> int:
     """Console script for open_notebook."""
-
     # get cli options
     parser = get_parser()
-    if args is None:
-        cli_options = parser.parse_args()  # pragma: no cover
-    else:
-        cli_options = parser.parse_args(args)
+    cli_options = (
+        parser.parse_args() if args is None else parser.parse_args(args)
+    )  # pragma: no cover
 
     set_verbosity_level(logger=logger, verbosity=cli_options.verbose)
-    logger.debug(f"cli options: {cli_options}")
+    logger.debug("cli options: %s", cli_options)
 
     if cli_options.version:
-        print(get_version_string())
+        print(get_version_string())  # noqa: T201
 
     elif cli_options.create_config:
         create_config(

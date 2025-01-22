@@ -9,7 +9,8 @@ import enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Mapping, Sequence
+    from collections.abc import Callable, Mapping, Sequence
+    from typing import Any
 
 
 # taken from https://github.com/python-attrs/attrs/blob/main/src/attr/_make.py
@@ -47,8 +48,8 @@ def get_in(
     factory: Callable[[], Any] | None = None,
 ) -> Any:
     """
-    >>> foo = {'a': {'b': {'c': 1}}}
-    >>> get_in(['a', 'b'], foo)
+    >>> foo = {"a": {"b": {"c": 1}}}
+    >>> get_in(["a", "b"], foo)
     {'c': 1}
 
     """
@@ -60,5 +61,4 @@ def get_in(
     except (KeyError, IndexError, TypeError):
         if factory is not None:
             return factory()
-        else:
-            return default
+        return default

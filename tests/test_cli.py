@@ -1,27 +1,25 @@
+# pylint: disable=unused-argument
 from __future__ import annotations
-from textwrap import dedent
 
+import locale
+import shlex
+from pathlib import Path
+from textwrap import dedent
 from typing import TYPE_CHECKING
+
 import pytest
 
-from pathlib import Path
-
 from open_notebook import cli
+from open_notebook._compat import tomllib  # noqa: PLC2701
 from open_notebook.utils import MISSING
 
-from .utils import run_inside_dir
-
-import shlex
+from .utils import base_options, run_inside_dir
 
 if TYPE_CHECKING:
-    from typing import Any
     import argparse
+    from typing import Any
+
     from open_notebook._typing import MISSING_TYPE
-
-
-# @pytest.fixture
-# def parser() -> ArgumentParser:
-#     return cli.get_parser()
 
 
 def parse_args(arg: str = "") -> argparse.Namespace:
@@ -48,26 +46,23 @@ def base_cli_options(
     dry: bool = False,
     paths: list[Path | str] | None = None,
 ) -> dict[str, Any]:
-    if paths is None:
-        paths_verified = []
-    else:
-        paths_verified = list(map(Path, paths))
+    paths_verified = [] if paths is None else [Path(p) for p in paths]
 
-    return dict(
-        host=host,
-        port=port,
-        root=root,
-        dir_prefix=dir_prefix,
-        file_prefix=file_prefix,
-        reset=reset,
-        config=config,
-        create_config=create_config,
-        overwrite=overwrite,
-        version=version,
-        verbose=verbose,
-        dry=dry,
-        paths=paths_verified,
-    )
+    return {
+        "host": host,
+        "port": port,
+        "root": root,
+        "dir_prefix": dir_prefix,
+        "file_prefix": file_prefix,
+        "reset": reset,
+        "config": config,
+        "create_config": create_config,
+        "overwrite": overwrite,
+        "version": version,
+        "verbose": verbose,
+        "dry": dry,
+        "paths": paths_verified,
+    }
 
 
 def test_parser() -> None:
@@ -106,14 +101,13 @@ def test_verbosity() -> None:
     import logging
 
     cli.main([])
-    # assert 0 == 0
-    assert cli.logger.level == 0
+    assert not cli.logger.level
 
     cli.set_verbosity_level(cli.logger, -1)
-    assert cli.logger.level == logging.ERROR
+    assert cli.logger.level == logging.ERROR  # type: ignore[comparison-overlap]
 
     cli.set_verbosity_level(cli.logger, 0)
-    assert cli.logger.level == logging.WARN
+    assert cli.logger.level == logging.WARNING
 
     cli.main(["-v"])
     assert cli.logger.level == logging.INFO
@@ -126,22 +120,6 @@ def test_version() -> None:
     import open_notebook
 
     assert cli.get_version_string() == f"open-notebook, {open_notebook.__version__}"
-
-
-def base_options(
-    host: str = "localhost",
-    port: str = "8888",
-    root: str = ".",
-    dir_prefix: str = "tree",
-    file_prefix: str = "notebooks",
-) -> dict[str, Any]:
-    return dict(
-        host=host,
-        port=port,
-        root=Path(root),
-        dir_prefix=dir_prefix,
-        file_prefix=file_prefix,
-    )
 
 
 def test_get_options(example_path: Path, home_path: Path) -> None:
@@ -173,7 +151,9 @@ def test_get_options_alt(example_path: Path, home_path: Path) -> None:
     port = "9999"
     """
 
-    with open(".open-notebook.toml", "w") as f:
+    with Path(".open-notebook.toml").open(
+        "w", encoding=locale.getpreferredencoding(False)
+    ) as f:
         f.write(dedent(s))
 
     # check config files:
@@ -194,12 +174,11 @@ def test_create_config0(example_path: Path) -> None:
     options = base_options()
     options["root"] = "."
 
-    cli.create_config(options=options, paths=[Path(".")])
+    cli.create_config(options=options, paths=[Path()])
 
-    import tomli
-
-    with open(".open-notebook.toml", "rb") as f:
-        data = tomli.load(f)
+    # with open(".open-notebook.toml", "rb") as f:
+    with Path(".open-notebook.toml").open("rb") as f:
+        data = tomllib.load(f)
 
     assert data == options
 
@@ -215,10 +194,8 @@ def test_create_config1(example_path: Path) -> None:
 
     cli.create_config(options=options, paths=[], home=".")
 
-    import tomli
-
-    with open(".open-notebook.toml", "rb") as f:
-        data = tomli.load(f)
+    with Path(".open-notebook.toml").open("rb") as f:
+        data = tomllib.load(f)
 
     assert data == options
 
@@ -227,7 +204,6 @@ def test_create_config2(example_path: Path) -> None:
     cli.main(["--create-config", "-r", ".", "."])
 
     options = base_options()
-    # options["root"] = "."
 
     from open_notebook import config
 
@@ -244,11 +220,19 @@ def test_open(example_path: Path) -> None:
 def test_run(example_path: Path) -> None:
     from open_notebook import __version__
 
-    for s in [
+    for s in (
         "open-notebook --version",
         "nopen --version",
-    ]:
+    ):
         out = run_inside_dir(s)
 
-        assert out.returncode == 0
+        assert not out.returncode
         assert out.stdout.decode().strip() == f"open-notebook, {__version__}"
+
+
+def test_main(example_path: Path) -> None:
+    from subprocess import check_call
+
+    out = check_call(shlex.split("python -m open_notebook --help"))  # noqa: S603
+
+    assert not out

@@ -22,8 +22,8 @@
 [docs-link]: https://pages.nist.gov/open-notebook/
 [repo-badge]: https://img.shields.io/badge/--181717?logo=github&logoColor=ffffff
 [repo-link]: https://github.com/usnistgov/open-notebook
-[conda-badge]: https://img.shields.io/conda/v/wpk-nist/open-notebook
-[conda-link]: https://anaconda.org/wpk-nist/open-notebook
+[conda-badge]: https://img.shields.io/conda/v/conda-forge/open-notebook
+[Conda-link]: https://anaconda.org/conda-forge/open-notebook
 [license-badge]: https://img.shields.io/pypi/l/cmomy?color=informational
 [license-link]: https://github.com/usnistgov/open-notebook/blob/main/LICENSE
 <!-- prettier-ignore-end -->
@@ -58,17 +58,24 @@ request for wanted features and suggestions!
 
 ## Quick start
 
-Use one of the following
+<!-- start-installation -->
+
+To install, use one of the following:
 
 ```bash
 pip install open-notebook
+# or
+conda install -c conda-forge open-notebook
+# or
+pipx install open-notebook
+# or
+condax install -c conda-forge open-notebook
 ```
 
-or
+We recommend using condax/pipx so that the application is available at all
+times.
 
-```bash
-conda install -c wpk-nist open-notebook
-```
+<!-- end-installation -->
 
 ## Example usage
 
