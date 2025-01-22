@@ -1,13 +1,13 @@
+# pylint: disable=unused-argument
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import pytest
 
 from open_notebook import config
 
-from .utils import inside_dir
+from .utils import base_options, inside_dir
 
 
 def test_config_simple() -> None:
@@ -19,22 +19,6 @@ def test_config_simple() -> None:
     from open_notebook.utils import get_in
 
     assert get_in(("hello"), {}, factory=list) == []
-
-
-def base_options(
-    host: str = "localhost",
-    port: str = "8888",
-    root: str = ".",
-    dir_prefix: str = "tree",
-    file_prefix: str = "notebooks",
-) -> dict[str, Any]:
-    return {
-        "host": host,
-        "port": port,
-        "root": Path(root),
-        "dir_prefix": dir_prefix,
-        "file_prefix": file_prefix,
-    }
 
 
 def test_base() -> None:
