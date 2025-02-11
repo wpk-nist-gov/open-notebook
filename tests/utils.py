@@ -39,7 +39,7 @@ def run_inside_dir(
 
     with inside_dir(dirpath):
         logger.info("Run: %s", command)
-        return subprocess.run(shlex.split(command), check=True, stdout=subprocess.PIPE)  # noqa: S603
+        return subprocess.run(shlex.split(command), check=True, stdout=subprocess.PIPE)
 
 
 def base_options(

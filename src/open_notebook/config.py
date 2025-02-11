@@ -36,8 +36,8 @@ def get_git_root_path(cwd: str | Path | None = None) -> Path | None:
     """Get root path of git repo."""
     if cwd:
         cwd = Path(cwd).expanduser().absolute()
-    result = subprocess.run(  # noqa: S603
-        ["git", "rev-parse", "--show-toplevel"],  # noqa: S607
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
         capture_output=True,
         cwd=cwd,
         check=False,
@@ -155,8 +155,8 @@ class Config:
         ----------
         key : str, optional
             key to look for.
-        passed : default=MISSING
-            Passed in value.  If not MISSING, this will be the returned value.
+        passed : object
+            Passed in value.  If not :obj:`.utils.MISSING`, this will be the returned value.
         section : str, optional
             The table section to check.  Fall back to top level of any dict.
         factory : callable, optional
