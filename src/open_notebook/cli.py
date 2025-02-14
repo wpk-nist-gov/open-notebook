@@ -182,7 +182,11 @@ def open_paths(options: dict[str, Any], paths: list[Path], dry: bool = False) ->
             handler.open_urls(url)  # pragma: no cover
 
 
-def main(args: Sequence[str] | None = None, home: str | Path | None = None) -> int:
+def main(
+    args: Sequence[str] | None = None,
+    *,
+    home: str | Path | None = None,
+) -> int:
     """Console script for open_notebook."""
     # get cli options
     parser = get_parser()

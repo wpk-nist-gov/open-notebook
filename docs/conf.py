@@ -49,13 +49,15 @@ extensions = [
     "sphinx_copybutton",
     "myst_parser",
     "sphinxarg.ext",
+    "sphinx_autodoc_typehints",
 ]
 
 autosectionlabel_prefix_document = True
 nitpicky = True
 suppress_warnings = ["autosectionlabel.*"]
 nitpick_ignore = [
-    # ("py:class", "MISSING"),
+    ("py:class", "MISSING_TYPE"),
+    ("py:class", "Path"),
 ]
 
 # -- myst stuff ---------------------------------------------------------
@@ -143,6 +145,21 @@ autodoc_default_flags = [
     "show-inheritance",
 ]
 autodoc_typehints = "none"
+
+
+autodoc_type_aliases = {
+    # "MISSING_TYPE": "MISSING_TYPE",
+    # "Path": "pathlib.Path",
+}
+
+
+# typehints_fully_qualified = True
+typehints_document_rtype = False
+typehints_use_rtype = False
+typehints_defaults = "comma"
+# always_document_param_types = True
+typehints_use_signature = True
+typehints_use_signature_return = True
 
 # -- napoleon ------------------------------------------------------------------
 napoleon_google_docstring = False
