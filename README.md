@@ -1,10 +1,13 @@
 <!-- markdownlint-disable MD041 -->
 
-[![Repo][repo-badge]][repo-link] [![Docs][docs-badge]][docs-link]
+<!-- prettier-ignore-start -->
+[![Repo][repo-badge]][repo-link]
+[![Docs][docs-badge]][docs-link]
 [![PyPI license][license-badge]][license-link]
 [![PyPI version][pypi-badge]][pypi-link]
 [![Conda (channel only)][conda-badge]][conda-link]
-[![Code style: ruff][ruff-badge]][ruff-link][![uv][uv-badge]][uv-link]
+[![Code style: ruff][ruff-badge]][ruff-link]
+[![uv][uv-badge]][uv-link]
 
 <!--
   For more badges, see
@@ -13,7 +16,6 @@
   [pypi-badge]: https://badge.fury.io/py/open-notebook
 -->
 
-<!-- prettier-ignore-start -->
 [ruff-badge]: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json
 [ruff-link]: https://github.com/astral-sh/ruff
 [uv-badge]: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json
@@ -28,11 +30,12 @@
 [Conda-link]: https://anaconda.org/conda-forge/open-notebook
 [license-badge]: https://img.shields.io/pypi/l/open-notebook?color=informational
 [license-link]: https://github.com/usnistgov/open-notebook/blob/main/LICENSE
-<!-- prettier-ignore-end -->
 
 <!-- other links -->
 
 [jupyter]: https://jupyter.org/
+
+<!-- prettier-ignore-end -->
 
 # `open-notebook`
 
