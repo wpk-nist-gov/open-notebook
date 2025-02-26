@@ -4,7 +4,7 @@
 [![PyPI license][license-badge]][license-link]
 [![PyPI version][pypi-badge]][pypi-link]
 [![Conda (channel only)][conda-badge]][conda-link]
-[![Code style: black][black-badge]][black-link]
+[![Code style: ruff][ruff-badge]][ruff-link][![uv][uv-badge]][uv-link]
 
 <!--
   For more badges, see
@@ -14,8 +14,10 @@
 -->
 
 <!-- prettier-ignore-start -->
-[black-badge]: https://img.shields.io/badge/code%20style-black-000000.svg
-[black-link]: https://github.com/psf/black
+[ruff-badge]: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json
+[ruff-link]: https://github.com/astral-sh/ruff
+[uv-badge]: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json
+[uv-link]: https://github.com/astral-sh/uv
 [pypi-badge]: https://img.shields.io/pypi/v/open-notebook
 [pypi-link]: https://pypi.org/project/open-notebook
 [docs-badge]: https://img.shields.io/badge/docs-sphinx-informational
@@ -24,7 +26,7 @@
 [repo-link]: https://github.com/usnistgov/open-notebook
 [conda-badge]: https://img.shields.io/conda/v/conda-forge/open-notebook
 [Conda-link]: https://anaconda.org/conda-forge/open-notebook
-[license-badge]: https://img.shields.io/pypi/l/cmomy?color=informational
+[license-badge]: https://img.shields.io/pypi/l/open-notebook?color=informational
 [license-link]: https://github.com/usnistgov/open-notebook/blob/main/LICENSE
 <!-- prettier-ignore-end -->
 
