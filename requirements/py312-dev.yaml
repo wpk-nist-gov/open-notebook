@@ -13,7 +13,6 @@ dependencies:
   - python=3.12
   - mypy>=1.15.0
   - nox>=2024.10.9
-  - packaging
   - pylint
   - pytest
   - pytest-cov
