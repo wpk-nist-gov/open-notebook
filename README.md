@@ -61,23 +61,19 @@ relative to a central server.
 This package is actively used by the author. Please feel free to create a pull
 request for wanted features and suggestions!
 
-## Quick start
+## Installation
 
 <!-- start-installation -->
 
 To install, use one of the following:
 
 ```bash
-pip install open-notebook
+pip/pipx/uv pip/uv tool install open-notebook
 # or
-conda install -c conda-forge open-notebook
-# or
-pipx install open-notebook
-# or
-condax install -c conda-forge open-notebook
+conda/condax install -c conda-forge open-notebook
 ```
 
-We recommend using condax/pipx so that the application is available at all
+We recommend using `uv tool install` so that the application is available at all
 times.
 
 <!-- end-installation -->

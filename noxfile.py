@@ -56,7 +56,7 @@ if sys.version_info < (3, 10):
 
 PACKAGE_NAME = "open-notebook"
 IMPORT_NAME = "open_notebook"
-KERNEL_BASE = "open_notebook"
+KERNEL_NAME = "open-notebook"
 
 # * nox options ------------------------------------------------------------------------
 
@@ -459,7 +459,13 @@ def uvx_run(
 def pre_commit_run(session: Session, *args: str | PathLike[str], **kwargs: Any) -> Any:
     """Run pre-commit via uvx."""
     return uvx_run(
-        session, "--with=pre-commit-uv", "pre-commit", "run", *args, **kwargs
+        session,
+        "--with=pre-commit-uv",
+        "pre-commit",
+        "run",
+        *args,
+        **kwargs,
+        locked=False,
     )
 
 
@@ -513,9 +519,9 @@ def install_ipykernel(session: Session) -> None:
         "install",
         "--user",
         "--name",
-        "open-notebook",
+        KERNEL_NAME,
         "--display-name",
-        "Python [venv: open-notebook]",
+        f"Python [venv: {KERNEL_NAME}]",
         success_codes=[0, 1],
     )
 
