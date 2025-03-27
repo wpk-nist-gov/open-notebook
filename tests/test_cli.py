@@ -106,7 +106,7 @@ def test_verbosity() -> None:
     cli.set_verbosity_level(cli.logger, -1)
     assert cli.logger.level == logging.ERROR  # type: ignore[comparison-overlap]
 
-    cli.set_verbosity_level(cli.logger, 0)
+    cli.set_verbosity_level(cli.logger, 0)  # type: ignore[unreachable]
     assert cli.logger.level == logging.WARNING
 
     cli.main(["-v"])
