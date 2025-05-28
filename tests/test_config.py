@@ -7,7 +7,7 @@ import pytest
 
 from open_notebook import config
 
-from .utils import base_options, inside_dir
+from .utils import base_options, inside_dir  # pyre-ignore[import-error]
 
 
 def test_config_simple() -> None:
@@ -18,7 +18,7 @@ def test_config_simple() -> None:
 
     from open_notebook.utils import get_in
 
-    assert get_in(("hello"), {}, factory=list) == []
+    assert get_in(("hello",), {}, factory=list) == []
 
 
 def test_base() -> None:

@@ -111,16 +111,15 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --host HOST           Host name (default='localhost')
-  -p PORT, --port PORT  Port (default='8888')
-  -r ROOT, --root ROOT  Directory servers was started in. Defaults to current working
+  -p, --port PORT       Port (default='8888')
+  -r, --root ROOT       Directory servers was started in. Defaults to current working
                         directory.
   --dir-prefix DIR_PREFIX
                         Directory prefix (default='tree')
   --file-prefix FILE_PREFIX
                         File prefix (default='notebooks')
   --reset
-  -c CONFIG, --config CONFIG
-                        Config style to use. This is the name of a header in one of the
+  -c, --config CONFIG   Config style to use. This is the name of a header in one of the
                         config files.
   --create-config       If passed, create .open-notebook.ini
   --overwrite           Pass to overwrite `~/.open-notebook.toml` if it exists with

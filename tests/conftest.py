@@ -8,7 +8,7 @@ import pytest
 
 from open_notebook import config
 
-from .utils import run_inside_dir
+from .utils import run_inside_dir  # pyre-ignore[import-error]
 
 if TYPE_CHECKING:
     from collections.abc import Generator

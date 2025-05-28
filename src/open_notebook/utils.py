@@ -57,7 +57,11 @@ def get_in(
     from functools import reduce
 
     try:
-        return reduce(operator.getitem, keys, nested_dict)
+        return reduce(  # ty: ignore[no-matching-overload]  # pyre-ignore[no-matching-overload]
+            operator.getitem,  # ty: ignore[invalid-argument-type] # pyre-ignore[bad-argument-type]
+            keys,
+            nested_dict,
+        )
     except (KeyError, IndexError, TypeError):
         if factory is not None:
             return factory()
