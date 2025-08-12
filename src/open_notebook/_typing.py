@@ -14,5 +14,7 @@ if TYPE_CHECKING:
     from .utils import _Missing  # pyright: ignore[reportPrivateUsage]  # noqa: F401
 
 
-MISSING_TYPE: TypeAlias = "Literal[_Missing.MISSING]"  # pyre-ignore[type-alias-error]
+MISSING_TYPE: TypeAlias = (
+    "Literal[_Missing.MISSING]"  # pyrefly: ignore[type-alias-error]
+)
 """Literal MISSING"""

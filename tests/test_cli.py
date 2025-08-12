@@ -13,7 +13,7 @@ from open_notebook import cli
 from open_notebook._compat import tomllib  # noqa: PLC2701
 from open_notebook.utils import MISSING
 
-from .utils import base_options, run_inside_dir  # pyre-ignore[import-error]
+from .utils import base_options, run_inside_dir  # pyrefly: ignore[import-error]
 
 if TYPE_CHECKING:
     import argparse
