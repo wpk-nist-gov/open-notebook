@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 # * Logging
 FORMAT = "[%(name)s - %(levelname)s] %(message)s"
 logging.basicConfig(level=logging.WARNING, format=FORMAT)
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 # * Options
