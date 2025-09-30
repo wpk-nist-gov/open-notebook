@@ -30,6 +30,7 @@
 [Conda-link]: https://anaconda.org/conda-forge/open-notebook
 [license-badge]: https://img.shields.io/pypi/l/open-notebook?color=informational
 [license-link]: https://github.com/usnistgov/open-notebook/blob/main/LICENSE
+[changelog-link]: https://github.com/usnistgov/open-notebook/blob/main/CHANGELOG.md
 
 <!-- other links -->
 
@@ -244,6 +245,10 @@ open-notebook example.ipynb
 ## Documentation
 
 See the [documentation][docs-link] for further details.
+
+## What's new?
+
+See [changelog][changelog-link].
 
 ## License
 
