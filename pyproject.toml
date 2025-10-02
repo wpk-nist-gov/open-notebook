@@ -138,6 +138,7 @@ exclude_also = [
 omit = [
     "*/vendored/*",
     "*/_typing.py",
+    "*/__main__.py",
 ]
 include = [
     "src/*",
