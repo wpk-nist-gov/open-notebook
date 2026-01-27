@@ -151,10 +151,9 @@ def test_get_options_alt(example_path: Path, home_path: Path) -> None:
     port = "9999"
     """
 
-    with Path(".open-notebook.toml").open(
-        "w", encoding=locale.getpreferredencoding(False)
-    ) as f:
-        f.write(dedent(s))
+    Path(".open-notebook.toml").write_text(
+        dedent(s), encoding=locale.getpreferredencoding(False)
+    )
 
     # check config files:
     from open_notebook import config
