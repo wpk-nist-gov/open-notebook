@@ -2,6 +2,7 @@
 Top level API (:mod:`open_notebook`)
 ======================================================
 """
+# ruff: noqa: RUF067
 
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _version
