@@ -1,7 +1,7 @@
 [build-system]
 build-backend = "uv_build"
 requires = [
-    "uv-build>=0.8.22,<0.9.0",
+    "uv-build>=0.8.22,<0.10.0",
 ]
 
 [project]
@@ -17,14 +17,13 @@ license-files = [ "LICENSE" ]
 authors = [
     { name = "William P. Krekelberg", email = "wpk@nist.gov" },
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -36,10 +35,12 @@ dependencies = [
     "tomli; python_version<'3.11'",
     "typing-extensions; python_version<'3.11'",
 ]
-urls.Documentation = "https://pages.nist.gov/open-notebook/"
-urls.Homepage = "https://github.com/usnistgov/open-notebook"
-scripts.nopen = "open_notebook.cli:main"
-scripts.open-notebook = "open_notebook.cli:main"
+[project.scripts]
+nopen = "open_notebook.cli:main"
+open-notebook = "open_notebook.cli:main"
+[project.urls]
+Documentation = "https://pages.nist.gov/open-notebook/"
+Homepage = "https://github.com/usnistgov/open-notebook"
 
 [dependency-groups]
 dev = [
@@ -59,18 +60,21 @@ docs = [
     "autodocsumm",
     "myst-parser",
     "sphinx>=5.3.0",
+    # additonal
     "sphinx-argparse",
     "sphinx-autodoc-typehints",
     "sphinx-book-theme",
     "sphinx-copybutton",
 ]
 # other packages/tools
+basedpyright = [ "basedpyright>=1.31.3" ]
 cog = [ "cogapp" ]
 ipython = [ "ipython" ]
-mypy = [ "mypy>=1.15.0", "orjson" ]
+mypy = [ "mypy[faster-cache]>=1.15.0" ]
 nox = [ "nox>=2025.5.1" ]
 pylint = [ "pylint" ]
 pytest = [ "pytest" ]
+typecheck-runner = [ "typecheck-runner>=0.1.0; python_version>'3.9'" ]
 # other environments
 docs-live = [
     "sphinx-autobuild",
@@ -87,6 +91,7 @@ test-extras = [
 typecheck = [
     { include-group = "pylint" },
     { include-group = "pytest" },
+    { include-group = "typecheck-runner" },
 ]
 
 # * uv -------------------------------------------------------------------------
@@ -97,9 +102,8 @@ default-groups = [ "dev" ]
 fork-strategy = "requires-python"
 required-version = ">=0.7.15"
 
-[tool.uv.pip]
-annotation-style = "line"
-generate-hashes = true
+[tool.uv.build-backend]
+source-include = [ "tests/**" ]
 
 [tool.uv.dependency-groups]
 dev.requires-python = ">=3.14"
@@ -112,19 +116,19 @@ ipython.requires-python = ">=3.14"
 mypy.requires-python = ">=3.14"
 nox.requires-python = ">=3.14"
 
-[tool.uv.build-backend]
-source-include = [ "tests/**" ]
+[tool.uv.pip]
+annotation-style = "line"
+generate-hashes = true
 
 # * Checks ---------------------------------------------------------------------
 
 [tool.repo-review]
 ignore = [
-    "GH",     # enable for actions
-    "PC140",  # do this externally
-    "PC170",  # pygrep
-    "PC901",  # ci message
-    "RTD",
     "NOX103", # I prefer using "nox.options.sessions"
+    "PC111",  # use doccmd instead of blacken-docs
+    "PC140",  # do this externally
+    "PC160",  # use typos
+    "PC170",  # pygrep
 ]
 
 [tool.check-wheel-contents]
@@ -132,53 +136,67 @@ toplevel = [ "open_notebook" ]
 src_dir = [ "src" ]
 
 [tool.pyproject-fmt]
+indent = 4
 # max_supported_python = "3.13"
+keep_full_version = true
+expand_tables = [
+    "project.entry-points",
+    "project.optional-dependencies",
+    "project.scripts",
+    "project.urls",
+]
+collapse_tables = [  ]
+
+[tool.typos.default.extend-identifiers]
+CPY = "CPY"
 
 # * Testing --------------------------------------------------------------------
 
 [tool.pytest.ini_options]
 addopts = [
-    "-ra",
+    "--cov-config=pyproject.toml",
+    "--doctest-glob=*.md",
+    "--doctest-modules",
+    "--pyargs",
     "--strict-config",
     "--strict-markers",
-    "--doctest-modules",
-    "--doctest-glob=*.md",
-    "--pyargs",
-    "--cov-config=pyproject.toml",
+    "-ra",
 ]
 testpaths = [
+    "README.md",
     "open_notebook",
     "tests",
-    "README.md",
 ]
 minversion = "8"
 log_cli_level = "INFO"
+log_level = "INFO"
 xfail_strict = true
 filterwarnings = [ "error" ]
 
-[tool.coverage.run]
-branch = true
+[tool.coverage.paths]
+source = [
+    "src/",
+    # needed for non editable doctests
+    ".nox/**/site-packages/",
+]
 
 [tool.coverage.report]
 show_missing = true
 exclude_also = [
-    "if TYPE_CHECKING:",
     "@overload",
+    "if TYPE_CHECKING:",
 ]
 omit = [
-    "*/vendored/*",
-    "*/_typing.py",
     "*/__main__.py",
+    "*/_typing.py",
+    "*/vendored/*",
 ]
 include = [
     "src/*",
 ]
 
-[tool.coverage.paths]
-source = [
-    "src/",
-    ".nox/**/site-packages/",
-]
+[tool.coverage.run]
+branch = true
 
 # * typecheck ---------------------------------------------------------------------
 
@@ -193,10 +211,10 @@ warn_unused_configs = true
 warn_unreachable = true
 exclude = [
     ".eggs",
-    ".tox",
     ".nox",
-    ".venv",
     ".numba_cache",
+    ".tox",
+    ".venv",
     "docs",
 ]
 check_untyped_defs = true
@@ -207,13 +225,9 @@ enable_error_code = [
     "truthy-bool",
 ]
 
-# [[tool.mypy.overrides]]
-# ignore_missing_imports = true
-# module = [  ]
-
-# [[tool.mypy.overrides]]
-# ignore_errors = true
-# module = [  ]
+[tool.pyrefly]
+project-includes = [ "tests" ]
+enabled-ignores = [ "pyrefly" ]
 
 [tool.pyright]
 include = [
@@ -221,12 +235,12 @@ include = [
     "tests",
 ]
 exclude = [
-    "**/__pycache__",
-    ".tox/**",
-    ".nox/**",
-    ".venv/**",
     "**/.mypy_cache",
     "**/.numba_cache",
+    "**/__pycache__",
+    ".nox/**",
+    ".tox/**",
+    ".venv/**",
 ]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
@@ -235,11 +249,12 @@ enableTypeIgnoreComments = false
 reportUnnecessaryTypeIgnoreComment = true
 reportUnreachable = "warning"
 
-[tool.pytype]
-inputs = [
-    "src",
-    "tests",
-]
+[tool.ty.analysis]
+# Disable support for `type: ignore` comments
+respect-type-ignore-comments = false
+
+[tool.ty.src]
+include = [ "tests" ]
 
 # * Dependency creation --------------------------------------------------------
 
@@ -259,6 +274,13 @@ pytest-accept = { pip = true }
 [tool.pyproject2conda.envs.dev]
 groups = "dev"
 
+[tool.pyproject2conda.envs.pre-commit-additional-dependencies]
+reqs = [
+    "rust-just",
+]
+skip-package = true
+style = "requirements"
+
 [tool.pyproject2conda.envs.test]
 groups = "test"
 python = "all"
@@ -275,20 +297,21 @@ reqs = [
     "cruft",
     "grayskull>=2.5.3",
     "nbqa>=1.8.4",
-    "pre-commit>=4.0.0",
     "pre-commit-uv",
+    "pre-commit>=4.0.0",
     "prek",
     "pyrefly>=0.37.0",
     "pyright>=1.1.396",
-    "basedpyright>=1.31.3",
     "scriv",
     "twine>=5.0.0",
     "ty",
 ]
 groups = [
+    "basedpyright",
     "cog",
     "mypy",
     "nox",
+    "typecheck-runner",
 ]
 skip-package = true
 style = "requirements"
