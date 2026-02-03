@@ -7,7 +7,8 @@ import pytest
 
 from open_notebook import config
 
-from .utils import base_options, inside_dir  # pyrefly: ignore[import-error]
+# pyrefly: ignore [missing-import]
+from .utils import base_options, inside_dir
 
 
 def test_config_simple() -> None:

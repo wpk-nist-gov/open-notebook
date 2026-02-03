@@ -8,7 +8,8 @@ import pytest
 
 from open_notebook import config
 
-from .utils import run_inside_dir  # pyrefly: ignore[import-error]
+# pyrefly: ignore [missing-import]
+from .utils import run_inside_dir
 
 if TYPE_CHECKING:
     from collections.abc import Generator
