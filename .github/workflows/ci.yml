@@ -145,6 +145,7 @@ jobs:
       - name: Test with nox
         env:
           python_version: ${{ matrix.python-version }}
+          TMPDIR: ${{ runner.temp }}
         run: >-
           $UVX_COMMAND nox -s test-"$python_version" -- ++installpkg dist/*.whl
         shell: bash
