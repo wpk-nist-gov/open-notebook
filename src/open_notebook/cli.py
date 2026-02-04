@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -216,9 +215,10 @@ def main(
 
     else:
         parser.print_help()
+        return 2
 
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())  # pragma: no cover
+    raise SystemExit(main())  # pragma: no cover

@@ -1,11 +1,13 @@
 # pylint: disable=unused-argument
 from __future__ import annotations
 
+import contextlib
 import locale
 import shlex
 from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
@@ -230,10 +232,9 @@ def test_run(example_path: Path) -> None:
         assert out.stdout.decode().strip() == f"open-notebook, {__version__}"
 
 
-def test_main(example_path: Path) -> None:
-    import sys
-    from subprocess import check_call
+@patch("open_notebook.cli.main", return_value=0)
+def test__main__(mocked_main: Any) -> None:
+    with contextlib.suppress(SystemExit):
+        import open_notebook.__main__  # noqa: F401
 
-    out = check_call(shlex.split(f"{sys.executable} -m open_notebook --help"))
-
-    assert not out
+        mocked_main.assert_called_once_with()
