@@ -187,7 +187,6 @@ exclude_also = [
     "if TYPE_CHECKING:",
 ]
 omit = [
-    "*/__main__.py",
     "*/_typing.py",
     "*/vendored/*",
 ]
