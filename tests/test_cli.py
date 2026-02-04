@@ -231,8 +231,9 @@ def test_run(example_path: Path) -> None:
 
 
 def test_main(example_path: Path) -> None:
+    import sys
     from subprocess import check_call
 
-    out = check_call(shlex.split("python -m open_notebook --help"))
+    out = check_call(shlex.split(f"{sys.executable} -m open_notebook --help"))
 
     assert not out

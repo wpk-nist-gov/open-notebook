@@ -6,7 +6,7 @@ Url creation/opening (:mod:`~open_notebook.handler`)
 from __future__ import annotations
 
 from os.path import relpath
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -39,7 +39,7 @@ class JupyterUrlHandler:
 
     def _path_to_url(self, path: Path, modifier: str, suffix: str | None = None) -> str:
         path = self._path_relative_to_root(path)
-        out = f"http://{self.host}:{self.port}/{modifier}/{path}"
+        out = f"http://{self.host}:{self.port}/{modifier}/{PurePosixPath(path)}"
         if suffix:
             out += suffix
         return out
