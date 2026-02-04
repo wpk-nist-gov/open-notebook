@@ -241,12 +241,38 @@ exclude = [
     ".tox/**",
     ".venv/**",
 ]
-pythonVersion = "3.11"
 typeCheckingMode = "strict"
+reportOverlappingOverload = true
+reportPropertyTypeMismatch = true
+reportUntypedClassDecorator = true
+reportUntypedFunctionDecorator = true
 # Extra flags
 enableTypeIgnoreComments = false
 reportUnnecessaryTypeIgnoreComment = true
 reportUnreachable = "warning"
+
+deprecateTypingAliases = true
+enableReachabilityAnalysis = false
+reportCallInDefaultInitializer = true
+reportImplicitOverride = true
+reportImportCycles = true
+# reportMissingSuperCall = true
+reportUninitializedInstanceVariable = true
+reportUnusedCallResult = true
+
+# type-checkers should type-check; linters should lint
+reportImplicitStringConcatenation = false
+reportPrivateUsage = false                # dupe of PLC2701
+reportPrivateImportUsage = false          # dupe of PLC2701
+reportUnusedImport = false                # dupe of F401
+reportUnusedVariable = false              # dupe of F841
+
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+# reportCallIssue = false
+# reportArgumentType = false
+# reportMissingImports = false
+reportUnusedCallResult = false
 
 [tool.ty.analysis]
 # Disable support for `type: ignore` comments

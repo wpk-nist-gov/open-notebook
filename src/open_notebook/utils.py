@@ -27,7 +27,7 @@ class _Missing(enum.Enum):
 
     MISSING = enum.auto()
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pyright: ignore[reportImplicitOverride]
         return "MISSING"  # pragma: no cover
 
     def __bool__(self) -> bool:
