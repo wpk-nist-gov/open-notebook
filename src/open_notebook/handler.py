@@ -90,4 +90,4 @@ def open_urls(
         urls = [urls]
 
     for url in urls:
-        webbrowser.open(url, new=new, autoraise=autoraise)
+        _ = webbrowser.open(url, new=new, autoraise=autoraise)

@@ -352,4 +352,4 @@ def create_config(
     """
 
     with path.open("w") as f:
-        f.write(dedent(out))
+        _ = f.write(dedent(out))

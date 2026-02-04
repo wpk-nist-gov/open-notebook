@@ -42,66 +42,66 @@ def get_parser() -> argparse.ArgumentParser:
         """,
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--host",
         type=str,
         default=MISSING,
         help="Host name (default='{host}')".format(**DEFAULT_PARAMS),
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-p",
         "--port",
         type=str,
         default=MISSING,
         help="Port (default='{port}')".format(**DEFAULT_PARAMS),
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-r",
         "--root",
         default=MISSING,
         help="Directory servers was started in. Defaults to current working directory.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--dir-prefix",
         type=str,
         default=MISSING,
         help="Directory prefix (default='{dir_prefix}')".format(**DEFAULT_PARAMS),
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--file-prefix",
         type=str,
         default=MISSING,
         help="File prefix (default='{file_prefix}')".format(**DEFAULT_PARAMS),
     )
-    parser.add_argument("--reset", action="store_true")
-    parser.add_argument(
+    _ = parser.add_argument("--reset", action="store_true")
+    _ = parser.add_argument(
         "-c",
         "--config",
         type=str,
         default=None,
         help="Config style to use.  This is the name of a header in one of the config files.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--create-config",
         action="store_true",
         help="If passed, create .open-notebook.ini",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Pass to overwrite `~/.open-notebook.toml` if it exists with `--create-config`",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--version", action="store_true", help="Print out program version"
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-v",
         "--verbose",
         action="count",
         help="Set verbosity level.  Can pass multiple times.",
     )
-    parser.add_argument("--dry", action="store_true", help="Dry run.")
-    parser.add_argument("paths", nargs="*", type=Path, help="file or paths to open")
+    _ = parser.add_argument("--dry", action="store_true", help="Dry run.")
+    _ = parser.add_argument("paths", nargs="*", type=Path, help="file or paths to open")
     return parser
 
 
