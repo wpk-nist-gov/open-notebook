@@ -38,6 +38,7 @@ dependencies = [
 [project.scripts]
 nopen = "open_notebook.cli:main"
 open-notebook = "open_notebook.cli:main"
+
 [project.urls]
 Documentation = "https://pages.nist.gov/open-notebook/"
 Homepage = "https://github.com/usnistgov/open-notebook"
@@ -66,16 +67,9 @@ docs = [
     "sphinx-book-theme",
     "sphinx-copybutton",
 ]
-# other packages/tools
+# other envs
 basedpyright = [ "basedpyright>=1.31.3" ]
 cog = [ "cogapp" ]
-ipython = [ "ipython" ]
-mypy = [ "mypy[faster-cache]>=1.15.0" ]
-nox = [ "nox>=2025.5.1" ]
-pylint = [ "pylint" ]
-pytest = [ "pytest" ]
-typecheck-runner = [ "typecheck-runner>=0.1.0; python_version>'3.9'" ]
-# other environments
 docs-live = [
     "sphinx-autobuild",
     { include-group = "docs" },
@@ -85,6 +79,11 @@ docs-spelling = [
     "sphinxcontrib-spelling",
     { include-group = "docs" },
 ]
+ipython = [ "ipython" ]
+mypy = [ "mypy[faster-cache]>=1.15.0" ]
+nox = [ "nox>=2025.5.1" ]
+pylint = [ "pylint" ]
+pytest = [ "pytest" ]
 test-extras = [
     { include-group = "test" },
 ]
@@ -93,32 +92,28 @@ typecheck = [
     { include-group = "pytest" },
     { include-group = "typecheck-runner" },
 ]
+typecheck-runner = [ "typecheck-runner>=0.1.0; python_version>'3.9'" ]
 
 # * uv -------------------------------------------------------------------------
 
 [tool.uv]
-managed = true
+required-version = ">=0.7.15"
 default-groups = [ "dev" ]
 fork-strategy = "requires-python"
-required-version = ">=0.7.15"
-
-[tool.uv.build-backend]
-source-include = [ "tests/**" ]
+managed = true
+build-backend.source-include = [ "tests/**" ]
+pip.annotation-style = "line"
+pip.generate-hashes = true
 
 [tool.uv.dependency-groups]
+cog.requires-python = ">=3.14"
 dev.requires-python = ">=3.14"
-docs.requires-python = ">=3.14"
 docs-live.requires-python = ">=3.14"
 docs-spelling.requires-python = ">=3.14"
-# other tools
-cog.requires-python = ">=3.14"
+docs.requires-python = ">=3.14"
 ipython.requires-python = ">=3.14"
 mypy.requires-python = ">=3.14"
 nox.requires-python = ">=3.14"
-
-[tool.uv.pip]
-annotation-style = "line"
-generate-hashes = true
 
 # * Checks ---------------------------------------------------------------------
 
@@ -144,8 +139,12 @@ expand_tables = [
     "project.optional-dependencies",
     "project.scripts",
     "project.urls",
+    "tool.pyproject2conda",
+    "tool.pyright.executionEnvironments",
+    "tool.pytest",
+    "tool.typos",
+    "tool.uv.dependency-groups",
 ]
-collapse_tables = [  ]
 
 [tool.typos.default.extend-identifiers]
 CPY = "CPY"
@@ -173,29 +172,25 @@ log_level = "INFO"
 xfail_strict = true
 filterwarnings = [ "error" ]
 
-[tool.coverage.paths]
-source = [
+[tool.coverage]
+run.branch = true
+paths.source = [
     "src/",
     # needed for non editable doctests
     ".nox/**/site-packages/",
 ]
-
-[tool.coverage.report]
-show_missing = true
-exclude_also = [
+report.exclude_also = [
     "@overload",
     "if TYPE_CHECKING:",
 ]
-omit = [
+report.include = [
+    "src/*",
+]
+report.omit = [
     "*/_typing.py",
     "*/vendored/*",
 ]
-include = [
-    "src/*",
-]
-
-[tool.coverage.run]
-branch = true
+report.show_missing = true
 
 # * typecheck ---------------------------------------------------------------------
 
@@ -247,19 +242,17 @@ reportPropertyTypeMismatch = true
 reportUntypedClassDecorator = true
 reportUntypedFunctionDecorator = true
 # Extra flags
-enableTypeIgnoreComments = false
-reportUnnecessaryTypeIgnoreComment = true
-reportUnreachable = "warning"
-
 deprecateTypingAliases = true
 enableReachabilityAnalysis = false
+enableTypeIgnoreComments = false
 reportCallInDefaultInitializer = true
 reportImplicitOverride = true
 reportImportCycles = true
 # reportMissingSuperCall = true
 reportUninitializedInstanceVariable = true
+reportUnnecessaryTypeIgnoreComment = true
+reportUnreachable = "warning"
 reportUnusedCallResult = true
-
 # type-checkers should type-check; linters should lint
 reportImplicitStringConcatenation = false
 reportPrivateUsage = false                # dupe of PLC2701
@@ -274,12 +267,10 @@ root = "tests"
 # reportMissingImports = false
 reportUnusedCallResult = false
 
-[tool.ty.analysis]
+[tool.ty]
 # Disable support for `type: ignore` comments
-respect-type-ignore-comments = false
-
-[tool.ty.src]
-include = [ "tests" ]
+analysis.respect-type-ignore-comments = false
+src.include = [ "tests" ]
 
 # * Dependency creation --------------------------------------------------------
 
