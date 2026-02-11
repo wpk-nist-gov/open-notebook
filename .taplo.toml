@@ -27,3 +27,7 @@ keys = [
 
 [rule.formatting]
 reorder_keys = false
+
+[[rule]]
+formatting.reorder_keys = false
+include = [ "**/.open-notebook.toml" ]
